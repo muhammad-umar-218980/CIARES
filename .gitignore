@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+.streamlit/secrets.toml
+data/investigations.json
+*.zip
+*.pdf
+.DS_Store
+Thumbs.db
