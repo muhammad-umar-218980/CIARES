@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ui.shared.passwords import hash_password, verify_credentials, verify_password
+from passwords import hash_password, verify_credentials, verify_password
 
 
 def test_hash_verifies_the_original_password():

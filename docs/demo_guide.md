@@ -3,31 +3,27 @@
 **Cybersecurity Incident Analysis and Response Expert System**
 
 This guide is for demonstrating CIARES when the examiner sees only the screen. Every claim
-below is verifiable from a screen in the application. Exact labels, expected numbers and safe
-answers are included.
+below is verifiable from a screen in the application, with exact labels and expected numbers.
 
-The application has two surfaces:
+The application has two routes:
 
-* the **public portal** at `/` — Home, Investigate, Scenarios, Results;
-* the **admin portal** at `/admin` — Dashboard, Knowledge base, Inference engine, Decision
-  engine, Audit, System map.
+* the **public portal** at `/` — Home, Investigate, Scenarios and Results as sidebar sections;
+* the **administration portal** at `/admin` — six tabs behind a sign-in gate.
 
 `/admin` is not linked anywhere. The sidebar, the pages and the buttons never mention it.
-That is intentional and worth saying out loud: the examiner is shown the whole expert system,
-while the public demo stays uncluttered.
 
 ---
 
 ## 1. The 30-second opening pitch
 
 > "CIARES is a rule-based Expert System for cybersecurity incident response. It takes raw
-> observations, reasons over a knowledge base of 60 manually authored IF–THEN rules using
-> forward chaining, derives findings, recommends a response, executes that response in a
-> simulated environment, and explains every decision. There is no machine learning and no
-> external AI service — every conclusion is traceable to a specific rule and specific facts."
+> observations, reasons over 60 manually authored IF–THEN rules using forward chaining, derives
+> findings, explains them in plain language, recommends a response, and — once the analyst
+> approves it — writes the response plan. There is no machine learning, no external AI service
+> and no simulation: every conclusion is traceable to a rule, and every action is carried out by
+> a human."
 
-Then point at the Home page metrics: **60 rules · 85 logical conditions · 5 modules**. That
-single row answers the two largest marking criteria.
+Point at the Home metrics: **60 rules · 85 logical conditions · 5 modules**.
 
 ---
 
@@ -43,23 +39,25 @@ single row answers the two largest marking criteria.
 | Forward chaining | `/admin` → Inference engine → Activation sequence | `AUTH-01 → 02 → 03 → 04`, then **fixed point** |
 | Working memory | `/admin` → Inference engine → Working memory | Observations, derived facts, deriving rule |
 | Three-valued logic | Investigate → boolean dropdowns | True / False / **Unknown** |
-| Explanation facility | Results → **Why this finding?** | Per-condition expected vs observed vs status |
-| Decision engine | Results → Proposed responses | Phase, priority, target, executable, blocked reason |
-| Simulated response | Results → Execute approved actions | `status=Active → status=Disabled` |
-| Target validation | `/admin` → Decision engine → Target validation lab | `USER-999` rejected with a reason |
+| Explanation facility | `/admin` → Inference engine → Justification | Per-condition expected vs observed vs status |
+| Prose explanation | Results → "What led to this" | Sentences only; no rule identifiers |
+| Rule ids on demand | Results → **Technical evidence (administrative)** | Collapsed table; rule ids only when opened |
+| Decision engine | `/admin` → Decision engine | Decision rules, recommendations, 15-action catalogue |
+| Human approval | Results → tick recommendations → Approve | Response plan appears; nothing executed by CIARES |
+| Written plan | Results after approval | Numbered steps + `.txt` download |
 | Knowledge acquisition | `/admin` → Knowledge base green banner | Catalogue validated; approved sources shown |
 | Persistence / audit | `/admin` → Audit | Records survive refresh; JSON/CSV download |
-| Hidden admin | Inspect the sidebar | Only four entries; no “Admin” text anywhere |
+| Hidden admin | Inspect the sidebar | Only four sections; no "Admin" text anywhere |
 
-**Say explicitly:** "The UI is not a mock-up. Every count, table and state change is generated
-from the rule objects and the engine at runtime."
+**Say explicitly:** "The UI is not a mock-up. Every count, table and sentence is generated from
+the rule objects and the engine at runtime."
 
 ---
 
 ## 3. Two-minute setup before the viva
 
-1. Open `/admin`, sign in, go to **Audit → Danger zone → Clear all records**. This gives a
-   clean dashboard. (Public users have no way to see or clear records.)
+1. Open `/admin`, sign in, go to **Audit → Danger zone → Clear all records**. This gives a clean
+   dashboard. (Public users have no way to see or clear records.)
 2. Reload `/` and confirm the sidebar shows exactly **Home, Investigate, Scenarios, Results**.
 3. Confirm Home prints **60 rules, 85 conditions, 80 fact fields, 5 modules** with no warning.
 4. Keep three input patterns ready for the public form:
@@ -74,11 +72,11 @@ from the rule objects and the engine at runtime."
 6. Never call the thresholds "industry standards". Say: **"configurable CIARES project
    assumptions, documented in the report."**
 7. Remember: numeric fields default to `0` and count as known; boolean fields default to
-   **Unknown**. Use the Unknown option deliberately when demonstrating uncertainty.
+   **Unknown**.
 
 ---
 
-## 4. The 14–16 minute demonstration script
+## 4. The demonstration script
 
 ### Step 1 — Home (1 minute)
 
@@ -88,9 +86,8 @@ from the rule objects and the engine at runtime."
 
 - "This is what an analyst sees. No account, no sign-in, immediate access."
 - "The counts are computed from the loaded rule objects at runtime, not typed into the page."
-- "Five knowledge modules, six scenarios, fifteen simulated response types."
-- "The sidebar has exactly four pages. There is no history page and no admin link — the
-  internal machinery is not part of the analyst's job."
+- "Five knowledge modules, six scenarios, fifteen response types."
+- "The sidebar has four sections. Investigate, Scenarios and Results are not separate URLs."
 
 ---
 
@@ -100,83 +97,70 @@ from the rule objects and the engine at runtime."
 
 **Say:**
 
-- "The scenario supplies observations only. It does not supply findings, responses or the
-  answer."
-- "The verification expander is a list the test suite asserts, not an input. If the engine
-  fails to derive one of those facts, the page shows a red regression error."
+- "The scenario supplies observations only. It does not supply findings or the answer."
+- "The expander lists the observations; the diagnosis will come from the engine."
 
-**Point at the observations:** 25 failed logins, success after failures, unusual location.
-**Point at the entities:** `USER-101`, `SESSION-204`.
+**Click Run this scenario.**
 
-**Click Run scenario.**
-
-Expected: **4 rule activations, 4 findings**.
+Expected: **4 rule activations, 4 findings**, threat level **100/100**.
 
 **Say:**
 
-- "Four rules fired: repeated failures, suspicious login sequence, unusual location, and
-  finally possible account compromise."
-- "The fourth rule could only fire after the first three inserted their conclusions into
-  working memory. That is forward chaining in action."
-
-**Click Open full results.**
+- "Four rules fired: repeated failures, suspicious login sequence, unusual location, and finally
+  possible account compromise."
+- "The fourth rule could only fire after the first three inserted their conclusions into working
+  memory. That is forward chaining in action."
 
 ---
 
 ### Step 3 — Results, the analyst view (3 minutes)
 
-**Point at the threat summary:** `1 critical · 2 high · 1 medium · 0 low`, and the severity
-chart beside it.
+**Point at the threat meter:** `100/100` with the sentence "Threat level 100 out of 100 —
+Critical severity: the evidence is conclusive or the activity is still in progress, so
+containment should begin immediately."
 
-**Say:** "This is the diagnosis. It is ordered by severity, and severity never discards a
-finding — it only sorts it."
+**Say:** "The score is a documented project assumption: Critical 50, High 25, Medium 10, Low 5,
+capped at 100. It is deterministic, not probabilistic."
 
-**Open the expanders marked “Why this finding?”.** There is one per finding.
+**Point at the headline and findings:** Possible account compromise (critical), repeated
+authentication failures (high), suspicious login sequence (high), unusual-location login
+(medium).
 
-- Pick **Possible account compromise**.
-- Show the rules behind it (`AUTH-04`) and the condition table: condition, observed value,
-  status.
-- Show the THEN line: `possible_account_compromise = True`.
+**Say:** "Findings are in sentences and ordered by severity. Severity sorts them; it never
+deletes one."
+
+**Point at "What led to this":** four paragraphs, each naming the observations that supported
+the conclusion.
 
 **Say:**
 
-> "This is the explanation facility exposed to the analyst. Every finding can be opened to
-> show the rule that produced it, the facts it read and whether each condition was satisfied.
-> Nothing is a black box — and this is the same data the admin trace uses."
+> "This is the explanation facility as the analyst sees it. Notice there is not a single rule
+> identifier: the reasoning is stated in the analyst's language. An auditor who wants the rule
+> ids can open the collapsed technical evidence table at the bottom — that is the same data the
+> admin trace uses."
 
-**Point at Proposed responses:**
-
-- `ACT-001 · Disable affected account`
-- Phase: Containment
-- Target: `account:USER-101`
-- Finding: Possible account compromise
-- Executable: Yes
-
-**Scroll to “Why these actions”.**
+**Point at Recommended response:** `ACT-001 · Disable affected account`, phase Containment, with
+the reason.
 
 **Say:**
 
 - "Not every finding produces an action. Diagnostic rules only diagnose; only rules that
-  recommend a response create an action."
-- "The Decision Engine chooses the target, checks that it exists and is in a valid state,
-  removes duplicates, and orders actions by phase and priority."
-- "Each action states why it qualifies, in the analyst's language."
+  recommend a response create a recommendation."
+- "The Decision Engine deduplicates, defers recovery until containment is verified, and orders
+  by phase and priority."
+- "Nothing happens until the analyst approves."
 
-**Click Execute approved actions.**
+**Click Approve selected recommendations.**
 
-Show:
+Show the **Response plan**: "Approved … 1 recommendation(s) accepted", the numbered step, the
+download button and the **Revise the approval** expander.
 
-- `Execution: Success — Account USER-101 changed from Active to Disabled`
-- `State change: status=Active → status=Disabled`
-- **Simulated environment after execution**: `USER-101` is now `Disabled`.
-
-**Say:** "This is a simulated environment. No real account was touched. The before → after
-state change proves the action executed against the simulator rather than being printed as
-text. The analyst approves; the system does not act on its own."
+**Say:** "This is the hand-over point. CIARES writes the plan; the analyst carries it out. No
+real account is touched, because CIARES has no connection to any system."
 
 ---
 
-### Step 4 — The hidden admin portal (1 minute)
+### Step 4 — The hidden administration portal (1 minute)
 
 **Type the URL:** `/admin`.
 
@@ -201,7 +185,7 @@ surfaces."
 
 - "These numbers are computed from investigations actually stored in SQLite, not hardcoded."
 - "Findings by severity and by module aggregate across every run."
-- "The inventory panel is the fixed simulated world that response actions operate on."
+- "Approved actions counts the recommendations an analyst accepted."
 
 **Click:** Knowledge base.
 
@@ -210,8 +194,8 @@ surfaces."
 **Say:**
 
 - "Each module has exactly 12 manually authored rules."
-- "The condition inventory at the bottom is machine-generated from the rule objects. That is
-  the evidence for the 50-condition requirement — 85 conditions across 80 distinct facts."
+- "The condition inventory at the bottom is machine-generated from the rule objects. That is the
+  evidence for the 50-condition requirement — 85 conditions across 80 distinct facts."
 
 **Open `AUTH-04 · Possible Account Compromise`.** It shows:
 
@@ -234,8 +218,8 @@ configuration file, and changing it changes the behaviour."
 
 **Open `MAL-02`:** show `process_on_approved_list is False`.
 
-**Say:** "This rule fires only on an explicit False. If the fact is Unknown, it cannot fire.
-That is the difference between 'not approved' and 'not checked'."
+**Say:** "This rule fires only on an explicit False. If the fact is Unknown, it cannot fire. That
+is the difference between 'not approved' and 'not checked'."
 
 **Open `POL-12 · Coordinated Privilege Compromise`:** show that its conditions reference
 `possible_account_compromise`, which is the conclusion of AUTH-04.
@@ -246,8 +230,8 @@ compromise only if the authentication module has already reached its own conclus
 **If he asks how the rules are validated:** point at the green banner.
 
 > "The knowledge acquisition module validates every rule on load — ID format, uniqueness,
-> description, at least one condition, no self-supporting conclusion, approved source, and
-> action/entity consistency. Any failure is shown as a red error here."
+> description, at least one condition, no self-supporting conclusion, approved source, and a
+> well-formed action key and phase. Any failure is shown as a red error here."
 
 ---
 
@@ -268,45 +252,33 @@ termination condition."
 **Justification tab:** select `AUTH-04`. Show each condition with the observed value and
 `Satisfied`, then the conclusion and the source.
 
-**Say:** "The trace explanation tells you what fired, in what order. The justification tells
-you why this rule fired, with the exact facts that satisfied each condition."
+**Say:** "The trace explanation tells you what fired, in what order. The justification tells you
+why this rule fired, with the exact facts that satisfied each condition."
 
 **Working memory tab:** show observations, derived conclusions and the deriving rule.
 
-**Say:** "Every derived fact records which rule produced it and which facts supported it. That
-is provenance, and it is why the explanation is not post-hoc storytelling."
+**Say:** "Every derived fact records which rule produced it and which facts supported it. That is
+provenance, and it is why the explanation is not post-hoc storytelling."
 
-**Reasoning log tab:** show start → observations → activations → diagnosis → decision →
-finish.
+**Reasoning log tab:** show start → observations → activations → diagnosis → decision → finish.
 
 ---
 
-### Step 7 — Decision engine + target validation lab (2 minutes)
+### Step 7 — Decision engine (2 minutes)
 
 **Click:** Decision engine.
 
-**Point at the six decision rules**, then the proposed-actions table for the selected record.
+**Point at the decision rules**, then the recommendations table for the selected record.
 
 **Say:** "The inference engine answers *what is happening*; this layer decides *what should be
-done about it* — selection, target validation, deduplication, containment before recovery,
-and ordering by phase and priority."
+done about it* — selection, deduplication, containment before recovery, and ordering by phase
+and priority."
 
-**Scroll to the action catalogue.** Show the phase, priority, target type, required field and
-valid states.
+**Scroll to the action catalogue.** Show the 15 actions with phase, priority and what each does.
 
-**Scroll to Target validation lab.**
-
-- Choose `disable_account`.
-- Type `USER-999` → **Validate target**.
-- Expected: *"Account USER-999 does not exist in the simulated environment; execution would be
-  rejected."*
-
-**Say:** "The Decision Engine validates the target against the simulated environment. An
-unknown identifier is blocked with a reason instead of silently succeeding. This is a safety
-property, not an error — and it is why the public form assigns valid targets automatically
-rather than letting analysts invent identifiers."
-
-- Type `USER-101` → **Validate target** → success.
+**Say:** "Requests are pure policy. The catalogue is the set of recommendations CIARES can make;
+there is no execution layer because a decision-support system should leave the action to the
+accountable human."
 
 ---
 
@@ -316,15 +288,15 @@ rather than letting analysts invent identifiers."
 
 Show:
 
-- each investigation with source, scenario ID, findings, critical count, executed count;
+- each investigation with source, scenario ID, findings, critical count, approved count;
 - filter by source and scenario;
-- select one → findings, observations, activations, actions;
+- select one → findings, observations, activations, recommendations;
 - **Download record (JSON)** and **Download summary (CSV)**;
 - the **Admin events** tab: sign-in, sign-out and clear actions.
 
-**Say:** "A record is written after every investigation and refreshed after execution, so the
-audit trail is the engine's output, not a separate log I typed. Records live in SQLite; on
-Streamlit Community Cloud the filesystem is ephemeral, which the dashboard states honestly."
+**Say:** "A record is written after every investigation and updated after approval, so the audit
+trail is the engine's output, not a separate log I typed. Records live in SQLite; on Streamlit
+Community Cloud the filesystem is ephemeral, which the dashboard states honestly."
 
 ---
 
@@ -332,14 +304,12 @@ Streamlit Community Cloud the filesystem is ephemeral, which the dashboard state
 
 Go back to **Scenarios** (public).
 
-**Option A — SCN-002 (malware):** 12 findings, 4 actions.
+**Option A — SCN-002 (malware):** 12 findings, 4 recommendations.
 
+- isolate endpoint
 - isolate process
 - terminate process
 - quarantine file
-- isolate endpoint
-
-Execute them and show `Running → Isolated → Terminated` and `Present → Quarantined`.
 
 **Say:** "The same engine and decision logic, a different module. It chose a different action
 chain because the findings were different."
@@ -351,12 +321,11 @@ privilege compromise**.
 compromise and the policy module to derive privilege escalation. It is the strongest proof of
 cross-module inference."
 
-Point out the action list: 3 proposed, 2 executable, 1 **Skipped** (inside the “Blocked or
-deferred actions” expander).
+Point out the recommendations: 2 ready to approve and 1 **deferred** in the "Deferred until
+containment is verified" expander.
 
-**Say:** "The recovery action `revoke_permissions` was suppressed because a containment action
-was already applied to the same account. CIARES refuses to restore access while containment
-is in effect."
+**Say:** "The recovery action `revoke_permissions` is deferred because a containment action is
+open. CIARES refuses to restore access while containment is in effect."
 
 ---
 
@@ -370,7 +339,7 @@ Use **Investigate** (public).
 - Everything else Unknown
 - Run
 
-**Expected:** "No rule fired for these observations."
+**Expected:** headline "No incident detected", threat level `0/100`, no findings.
 
 **Say:** "No evidence, no finding. The system does not invent an incident from weak signals."
 
@@ -383,33 +352,32 @@ Use **Investigate** (public).
 
 **Expected:** no findings.
 
-**Say:** "Unknown means 'not established'. It never satisfies a rule. A rule that needs a fact
-to be True cannot fire just because nobody provided it."
+**Say:** "Unknown means 'not established'. It never satisfies a rule. A rule that needs a fact to
+be True cannot fire just because nobody provided it."
 
-#### Test C — blocked target (admin only)
+#### Test C — the evidence table
 
-- `/admin` → Decision engine → Target validation lab
-- `USER-999` → Validate target
+- Run any scenario → Results → open **Technical evidence (administrative)**
 
-**Expected:** blocked with a reason.
+**Expected:** rule ids, names, conclusions and severities.
 
-**Say:** "Same decision layer, same validation, demonstrated directly. The public analyst
-never sees an identifier field, because the system assigns valid targets from the inventory."
+**Say:** "The public narrative hides the ids, but they are one click away for audit. Nothing is
+hidden; it is only kept out of the analyst's reading flow."
 
 ---
 
 ## 5. Scenario cheat sheet
 
-| Scenario | What it proves | Activations | Findings | Actions |
+| Scenario | What it proves | Activations | Findings | Recommendations |
 |---|---|---|---|---|
 | **SCN-001** Account Compromise | classic chaining AUTH-01 → 04 | 4 | 4 | 1: disable account |
-| **SCN-002** Malware | multi-stage process/file/endpoint response | 12 | 12 | 4: isolate process, terminate, quarantine file, isolate endpoint |
-| **SCN-003** Network Intrusion | C2 + exfiltration reasoning | 12 | 12 | 4: block destination, restrict connection, escalate, isolate endpoint |
+| **SCN-002** Malware | multi-stage process/file/endpoint response | 12 | 12 | 4: isolate endpoint, isolate process, terminate, quarantine file |
+| **SCN-003** Network Intrusion | C2 + exfiltration reasoning | 12 | 12 | 4: isolate endpoint, block destination, restrict connection, escalate |
 | **SCN-004** Data Exfiltration | volume + unauthorized destination | 9 | 9 | 2: restrict transfer, restrict data access |
-| **SCN-005** Privilege Escalation | cross-module POL-12 | 16 | 16 | 3 proposed, 2 executable, 1 skipped |
+| **SCN-005** Privilege Escalation | cross-module POL-12 | 16 | 16 | 3: disable account, 1 deferred recovery, escalate |
 | **SCN-006** Credential Abuse + Integrity | tri-state auth + integrity breach | 15 | 15 | 3: disable account, revoke session, escalate |
 
-Memorise the SCN-001 numbers: **4 rules, 4 findings, 1 action, 1 state change**.
+Memorise the SCN-001 numbers: **4 rules, 4 findings, 1 recommendation, 1 written plan**.
 
 ---
 
@@ -433,8 +401,8 @@ A: 60 manually authored IF–THEN rules across five modules. Each rule is declar
 
 **Q: Forward or backward chaining?**
 A: Forward. Incident analysis is evidence-first: we start from observations and derive
-conclusions until a fixed point. Backward chaining would start from a hypothesis, which is
-less suitable when the incident type is unknown.
+conclusions until a fixed point. Backward chaining would start from a hypothesis, which is less
+suitable when the incident type is unknown.
 
 **Q: What is working memory?**
 A: The facts of the current investigation only. Each fact is True, False or Unknown, and every
@@ -446,43 +414,43 @@ evaluate to True; an Unknown condition makes the rule ineligible. Explicit False
 negative condition such as "process is not on the approved list", but never "fact is True".
 
 **Q: How do you stop rules firing forever?**
-A: Facts are only added, never retracted, and each activation key — rule id + entity ids +
-the exact supporting facts — can fire once. The engine stops at a fixed point, with a cycle
-cap as a safety guard.
+A: Facts are only added, never retracted, and each activation key — rule id plus the exact
+supporting facts — can fire once. The engine stops at a fixed point, with a cycle cap as a
+safety guard.
 
 **Q: How do you resolve conflicts between rules?**
 A: Firing order is deterministic: severity, then author priority, then rule id. Findings are
-never discarded because another finding is more severe. Actions are deduplicated by action +
-target, and recovery is suppressed while containment applies to the same target.
+never discarded because another finding is more severe. Recommendations are deduplicated by
+action key, and recovery is deferred while containment is open.
 
-**Q: What is the difference between a finding and an action?**
-A: Findings are diagnoses. Only rules marked actionable carry a recommended response, phase
-and target type. So the system can report a problem without inventing a response.
+**Q: What is the difference between a finding and a recommendation?**
+A: Findings are diagnoses. Only rules marked actionable carry a recommended response and phase.
+So the system can report a problem without inventing a response.
 
 **Q: How is the explanation generated?**
-A: The engine records every activation with its condition evaluations. The Explanation
-Facility reads those records to produce the trace and the per-rule justification. It never
-re-runs or re-reasons.
+A: The engine records every activation with its condition evaluations. The Explanation Facility
+reads those records to produce the admin trace and per-rule justification; the Report Writer
+turns the same records into the sentences the public portal shows. Neither re-runs the engine.
 
 **Q: Why are there two portals?**
-A: A product decision. The analyst needs the diagnosis, the reasoning behind a finding and the
-recommended response; that is the public portal. The knowledge base, activation trace and
-decision internals are administration concerns, so they sit behind `/admin`. Both surfaces
-call the same engine, so there is no second reasoning path that could drift from the tests.
+A: A product decision. The analyst needs the diagnosis, the reasoning and the recommendation;
+that is `/`. The knowledge base, activation trace and decision internals are administration
+concerns, so they sit behind `/admin`. Both surfaces call the same engine, so there is no second
+reasoning path that could drift from the tests.
 
 **Q: Is `/admin` secure?**
-A: It is a demonstration gate, not an identity provider: a single administrator, a PBKDF2
-hash in secrets, constant-time comparison, and a five-attempt session lock. The page is hidden
-from navigation, but hiding is not security — the credential is what protects it. I describe
-it as a session-level control, not enterprise auth.
+A: It is a demonstration gate, not an identity provider: a single administrator, a PBKDF2 hash
+in secrets, constant-time comparison, and a five-attempt session lock. The page is hidden from
+navigation, but hiding is not security — the credential is what protects it. I describe it as a
+session-level control, not enterprise auth.
 
 **Q: How do you know all 60 rules are real and not padding?**
-A: A coverage test asserts that every registered rule fires in at least one shipped scenario.
-If a rule can never activate, the test suite fails. All 60 are currently reachable.
+A: A coverage test asserts that every registered rule fires in at least one shipped scenario. If
+a rule can never activate, the test suite fails. All 60 are currently reachable.
 
 **Q: Where are the 50 conditions?**
-A: 85 logical conditions across 80 distinct fact fields. The Knowledge base tab regenerates
-the inventory from the rule objects at runtime, so the count cannot drift from the code.
+A: 85 logical conditions across 80 distinct fact fields. The Knowledge base tab regenerates the
+inventory from the rule objects at runtime, so the count cannot drift from the code.
 
 **Q: Are the thresholds industry standards?**
 A: No. They are configurable CIARES project assumptions, stated as such in the report. The
@@ -494,18 +462,17 @@ A: No, by design. Knowledge acquisition is manual and validated. The value of th
 transparent, auditable reasoning, not statistical prediction.
 
 **Q: Can it affect a real system?**
-A: No. Every response executes against an in-memory simulated environment with eight entity
-types and fifteen actions. The UI shows before/after state changes inside that simulation.
+A: No. There is no execution layer at all. CIARES recommends and writes a plan; the analyst
+carries it out. That boundary is deliberate for a decision-support system.
 
 **Q: What are its limitations?**
-A: Simulated responses only; manual knowledge acquisition; one primary entity per type per
-investigation; monotonic inference with no retraction; numeric inputs are always considered
-known while booleans are tri-state; thresholds are assumptions; SQLite is ephemeral on
-Community Cloud.
+A: Manual knowledge acquisition; one incident per investigation; monotonic inference with no
+retraction; numeric inputs are always considered known while booleans are tri-state; thresholds
+and the threat score are assumptions; SQLite is ephemeral on Community Cloud.
 
 **Q: Why Streamlit?**
-A: It keeps the whole project Python-only and lets the UI call the engine directly, so there
-is no second code path between the demo and the tests.
+A: It keeps the whole project Python-only and lets the UI call the engine directly, so there is
+no second code path between the demo and the tests.
 
 ---
 
@@ -513,11 +480,11 @@ is no second code path between the demo and the tests.
 
 Say this proactively:
 
-> "Three honest limitations: responses are simulated by design; knowledge is manually curated
-> rather than learned; and the investigation is single-focus — one account, one session, one
-> process per run. The activation key already supports multiple entities, so that is a future
-> extension rather than a redesign. The admin gate is a demonstration control, and SQLite on
-> Community Cloud is ephemeral — both stated in the app rather than hidden."
+> "Three honest limitations: knowledge is manually curated rather than learned; the
+> investigation is single-focus — one incident per run; and CIARES deliberately stops at the
+> recommendation, because a decision-support system should leave the action to the accountable
+> human. The admin gate is a demonstration control, and SQLite on Community Cloud is ephemeral —
+> both stated in the app rather than hidden."
 
 Examiners reward acknowledged boundaries far more than overclaiming.
 
@@ -526,25 +493,25 @@ Examiners reward acknowledged boundaries far more than overclaiming.
 ## 9. One-page cheat sheet
 
 ```text
-Routes:       /  /investigate  /scenarios  /results      (public, no login)
-              /admin                                      (typed manually, email + password)
+Routes:       /       public portal (Home, Investigate, Scenarios, Results)
+              /admin  typed manually, email + password
 
 Rules:        60   (12 × AUTH, MAL, NET, DATA, POL)
 Conditions:   85   (50 required)
 Fact fields:  80
-Tests:        111 passed, 0 skipped
+Actions:      15
+Tests:        106 passed, 0 skipped
 Scenarios:    6, all 60 rules reachable
 
-SCN-001 -> 4 activations / 4 findings / 1 action -> disable USER-101
-SCN-002 -> 12 / 12 / 4 -> isolate+terminate process, quarantine file, isolate endpoint
-SCN-003 -> 12 / 12 / 4 -> block destination, restrict connection, escalate, isolate endpoint
+SCN-001 -> 4 activations / 4 findings / 1 recommendation -> disable account
+SCN-002 -> 12 / 12 / 4 -> isolate endpoint + process, terminate, quarantine file
+SCN-003 -> 12 / 12 / 4 -> isolate endpoint, block destination, restrict connection, escalate
 SCN-004 -> 9 / 9 / 2 -> restrict transfer + data access
-SCN-005 -> 16 / 16 / 3 proposed, 1 skipped -> cross-module POL-12
+SCN-005 -> 16 / 16 / 3 -> cross-module POL-12, 1 recovery deferred
 SCN-006 -> 15 / 15 / 3 -> disable, revoke session, escalate
 
 Edge cases:
-  3 failures               -> no finding
-  Unknown booleans         -> no finding
-  USER-999 (admin lab)     -> Blocked: account does not exist
-  USER-101 + full evidence -> Executable, Active -> Disabled
+  3 failures                -> No incident detected, 0/100
+  Unknown booleans          -> no finding
+  Evidence table (Results)  -> rule ids only when expanded
 ```

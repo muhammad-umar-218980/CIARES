@@ -1,28 +1,37 @@
 """
 Complete-investigation tests: a scenario must run end to end through the same
-pipeline the Streamlit UI uses, from observations to simulated execution.
+pipeline the Streamlit portal uses, from observations to a written response plan.
 """
 
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
 from engine.pipeline import run_investigation
+from engine.report import (
+    approve,
+    evidence_rows,
+    plan_steps,
+    plan_text,
+    reasoning_paragraphs,
+    threat_score,
+    threat_sentence,
+)
 from knowledge_base.rule_registry import ALL_RULES
 from scenarios.sample_scenarios import SCENARIOS, get_scenario
-from simulation import execute
 
 SCENARIO_IDS = [scenario.id for scenario in SCENARIOS]
+RULE_ID = re.compile(r"\b(AUTH|MAL|NET|DATA|POL)-\d{2}\b")
 
 
 def run(scenario_id: str):
     scenario = get_scenario(scenario_id)
     return run_investigation(
         scenario.observations,
-        scenario.entities,
-        scenario.name,
+        name=scenario.name,
         scenario_id=scenario.id,
     )
 
@@ -31,7 +40,6 @@ def run(scenario_id: str):
 def test_every_scenario_runs_without_error(scenario_id):
     investigation = run(scenario_id)
     assert investigation.id.startswith("INV-")
-    assert investigation.environment is not None
     if len(ALL_RULES) >= 60:
         assert investigation.activations
 
@@ -68,21 +76,8 @@ def test_account_compromise_scenario_recommends_disabling_the_account():
     action = next(
         action for action in investigation.actions if action.action == "disable_account"
     )
-    assert action.target_id == "USER-101"
-    assert action.executable is True
-
-
-def test_account_compromise_response_executes_in_the_simulation():
-    investigation = run("SCN-001")
-    action = next(
-        action for action in investigation.actions if action.action == "disable_account"
-    )
-
-    result = execute(investigation.environment, action)
-
-    assert result.success is True
-    assert investigation.environment.status_of("account", "USER-101") == "Disabled"
-    assert action.status == "Executed"
+    assert action.phase.value == "Containment"
+    assert action.deferred is False
 
 
 def test_missing_evidence_prevents_the_compromise_finding():
@@ -90,9 +85,7 @@ def test_missing_evidence_prevents_the_compromise_finding():
     observations = dict(scenario.observations)
     observations.pop("unusual_login_location", None)
 
-    investigation = run_investigation(
-        observations, scenario.entities, "Incomplete evidence"
-    )
+    investigation = run_investigation(observations, name="Incomplete evidence")
 
     derived = {finding.key for finding in investigation.findings}
     assert "possible_account_compromise" not in derived
@@ -111,43 +104,64 @@ def test_expected_chains_are_met_once_the_modules_are_authored(scenario_id):
 
 
 # ---------------------------------------------------------------------------
-# Target validation through the real pipeline
+# The public narrative: prose, not rule identifiers
 # ---------------------------------------------------------------------------
-def test_pipeline_rejects_a_target_that_does_not_exist():
-    investigation = run_investigation(
-        {
-            "failed_login_attempts": 25,
-            "successful_login_after_failures": True,
-            "unusual_login_location": True,
-        },
-        {"account_id": "USER-999"},
-        "Invalid target investigation",
-    )
+@pytest.mark.parametrize("scenario_id", SCENARIO_IDS)
+def test_public_narrative_hides_rule_identifiers(scenario_id):
+    investigation = run(scenario_id)
+    narrative = " ".join(reasoning_paragraphs(investigation))
+    assert narrative
+    assert RULE_ID.search(narrative) is None
 
-    action = next(
-        action for action in investigation.actions if action.action == "disable_account"
-    )
-    assert action.executable is False
-    assert "does not exist" in action.blocked_reason
+    sentence = threat_sentence(investigation)
+    assert RULE_ID.search(sentence) is None
+    assert "Threat level" in sentence
 
-    result = execute(investigation.environment, action)
-    assert result.success is False
-    assert "does not exist" in result.message
+    score = threat_score(investigation)
+    assert 0 <= score <= 100
 
 
-def test_pipeline_keeps_the_seeded_target_executable():
-    investigation = run_investigation(
-        {
-            "failed_login_attempts": 25,
-            "successful_login_after_failures": True,
-            "unusual_login_location": True,
-        },
-        {"account_id": "USER-101"},
-        "Valid target investigation",
-    )
+@pytest.mark.parametrize("scenario_id", SCENARIO_IDS)
+def test_evidence_table_keeps_the_rule_identifiers_for_administration(scenario_id):
+    investigation = run(scenario_id)
+    rows = evidence_rows(investigation)
+    assert rows
+    assert all(RULE_ID.match(str(row["Rule"])) for row in rows)
 
-    action = next(
-        action for action in investigation.actions if action.action == "disable_account"
-    )
-    assert action.executable is True
-    assert action.blocked_reason == ""
+
+# ---------------------------------------------------------------------------
+# Approval and the written response plan
+# ---------------------------------------------------------------------------
+def test_approval_only_covers_the_selected_recommendations():
+    investigation = run("SCN-005")
+    ready = [action for action in investigation.actions if not action.deferred]
+    assert len(ready) >= 2
+
+    approved = approve(investigation, [ready[0].action_id])
+
+    assert [action.action_id for action in approved] == [ready[0].action_id]
+    assert investigation.approved_at
+    assert len(investigation.approved_actions) == 1
+
+
+def test_deferred_recovery_cannot_be_approved():
+    investigation = run("SCN-005")
+    deferred = [action for action in investigation.actions if action.deferred]
+    assert deferred, "SCN-005 should defer a recovery action"
+
+    approve(investigation, [action.action_id for action in deferred])
+    assert investigation.approved_actions == []
+
+
+def test_response_plan_is_written_after_approval():
+    investigation = run("SCN-001")
+    approve(investigation, [action.action_id for action in investigation.actions])
+
+    steps = plan_steps(investigation)
+    assert steps
+    assert all(step.endswith(".") for step in steps)
+
+    text = plan_text(investigation)
+    assert "CIARES RESPONSE PLAN" in text
+    assert investigation.id in text
+    assert "APPROVED RESPONSE" in text

@@ -14,7 +14,7 @@ Checks performed here
   (a rule may not support itself) and is a snake_case fact key
 * the severity is one of Critical / High / Medium / Low
 * the source is one of the approved references
-* an actionable rule declares a phase and an entity type
+* an actionable rule declares a response phase
 * the recommended action is a machine-readable key
 """
 
@@ -30,17 +30,6 @@ from engine.models import Phase, Rule, Severity
 RULE_ID_PATTERN = re.compile(r"^(AUTH|MAL|NET|DATA|POL)-\d{2}$")
 FACT_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 ACTION_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
-ENTITY_TYPES = (
-    "account",
-    "session",
-    "process",
-    "file",
-    "transfer",
-    "destination",
-    "endpoint",
-    "connection",
-    "incident",  # escalation findings refer to the investigation itself
-)
 
 
 @dataclass
@@ -101,11 +90,6 @@ def validate_rule(rule: Rule) -> list[str]:
             errors.append(f"{rule.id}: recommended action must be a snake_case key")
         if not isinstance(rule.action_phase, Phase):
             errors.append(f"{rule.id}: action phase must be a Phase value")
-        if rule.entity_type not in ENTITY_TYPES:
-            errors.append(
-                f"{rule.id}: actionable rules need an entity type, one of "
-                f"{', '.join(ENTITY_TYPES)}"
-            )
     return errors
 
 

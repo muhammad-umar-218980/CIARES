@@ -18,8 +18,8 @@ from knowledge_base.knowledge_acquisition import validate_catalogue
 from knowledge_base.rule_registry import ALL_RULES
 
 
-def fired_rules(rules, observations, entities=None) -> set[str]:
-    memory = WorkingMemory(entities)
+def fired_rules(rules, observations) -> set[str]:
+    memory = WorkingMemory()
     memory.add_observations(observations)
     result = InferenceEngine(rules).run(memory)
     return {activation.rule.id for activation in result.activations}

@@ -16,7 +16,6 @@ from engine.pipeline import run_investigation
 from knowledge_base.knowledge_acquisition import validate_catalogue
 from knowledge_base.rule_registry import ALL_RULES, MODULES, RULES_BY_MODULE
 from scenarios.sample_scenarios import SCENARIOS
-from simulation import execute
 
 EXPECTED_RULES = 60
 EXPECTED_PER_MODULE = 12
@@ -28,8 +27,7 @@ def investigations():
     return {
         scenario.id: run_investigation(
             scenario.observations,
-            scenario.entities,
-            scenario.name,
+            name=scenario.name,
             scenario_id=scenario.id,
         )
         for scenario in SCENARIOS
@@ -121,16 +119,13 @@ def test_every_actionable_rule_produces_a_matching_response(investigations):
     assert actionable == proposed
 
 
-def test_every_executable_action_succeeds_in_the_simulation(investigations):
-    executed = 0
+def test_recommendations_wait_for_human_approval(investigations):
+    checked = 0
     for investigation in investigations.values():
         for action in investigation.actions:
-            if not action.executable:
-                continue
-            result = execute(investigation.environment, action)
-            assert result.success is True, (investigation.id, action.action, result.message)
-            executed += 1
-    assert executed > 0
+            assert action.approved is False
+            checked += 1
+    assert checked > 0
 
 
 def test_containment_precedes_recovery_and_escalation(investigations):

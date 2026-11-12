@@ -12,8 +12,8 @@ from engine.working_memory import ContradictionError, WorkingMemory
 from knowledge_base.authentication import AUTH_RULES
 
 
-def run(observations=None, entities=None):
-    memory = WorkingMemory(entities)
+def run(observations=None):
+    memory = WorkingMemory()
     memory.add_observations(observations or {})
     result = InferenceEngine(AUTH_RULES).run(memory)
     return memory, result
@@ -62,19 +62,24 @@ def test_empty_working_memory_activates_nothing():
 # ---------------------------------------------------------------------------
 # Activation key
 # ---------------------------------------------------------------------------
-def test_activation_key_includes_entities_and_supporting_facts():
+def test_activation_key_matches_the_supporting_facts():
     rule = AUTH_RULES[0]
-    memory = WorkingMemory({"account_id": "USER-101"})
+    memory = WorkingMemory()
     memory.add_observation("failed_login_attempts", 25)
     engine = InferenceEngine([rule])
     _, evaluations = engine.evaluate_rule(rule, memory)
 
-    key_one = engine.activation_key(rule, memory.entities, evaluations)
-    key_one_again = engine.activation_key(rule, {"account_id": "USER-101"}, evaluations)
-    key_other_account = engine.activation_key(rule, {"account_id": "USER-202"}, evaluations)
+    key_one = engine.activation_key(rule, evaluations)
+    key_one_again = engine.activation_key(rule, evaluations)
+
+    other_memory = WorkingMemory()
+    other_memory.add_observation("failed_login_attempts", 40)
+    _, other_evaluations = engine.evaluate_rule(rule, other_memory)
+    key_other_value = engine.activation_key(rule, other_evaluations)
 
     assert key_one == key_one_again
-    assert key_one != key_other_account
+    assert key_one != key_other_value
+    assert rule.id in key_one
 
 
 # ---------------------------------------------------------------------------

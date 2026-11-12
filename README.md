@@ -2,117 +2,113 @@
 
 **Cybersecurity Incident Analysis and Response Expert System**
 
-A Python-based, rule-driven Expert System that investigates security incidents, derives
-findings with forward chaining, recommends responses, executes them in a simulated
-environment and explains every decision.
+A small, rule-based Expert System written in **Python + Streamlit**. You describe what was
+observed; CIARES decides what it means, explains why in plain language, recommends a
+response, and — once you approve it — writes the response plan.
 
-Built with **Python + Streamlit only**. No trained model, no external reasoning service:
-every conclusion is traceable to a manually authored IF-THEN rule.
+No trained model. No external AI service. No simulation. Every conclusion comes from a
+manually authored IF-THEN rule.
 
 ---
 
-## 1. What problem does it solve?
+## 1. The idea
 
-A security dashboard shows events. CIARES reasons about them.
+A security dashboard shows events. CIARES reasons about them:
 
 ```
-Observations (25 failed logins, success after failures, unusual location)
-        -> Working Memory
-        -> Knowledge Base (AUTH-01, AUTH-02, AUTH-03)
-        -> Inference Engine (forward chaining)
-        -> AUTH-04: Possible account compromise
-        -> Decision Engine: disable USER-101
-        -> Simulated execution: USER-101 now Disabled
-        -> Explanation: which rules fired, on which facts, why the action ran
+25 failed logins + a success afterwards + an unusual location
+        -> 4 findings, the worst being "Possible account compromise"
+        -> "Critical: examine the account and contain it now"
+        -> Recommendation: disable the affected account
+        -> You tick the recommendations you accept
+        -> A written response plan you can download
 ```
 
-## 2. Two portals, one engine
+CIARES never touches a real account, host or network. It is decision support: the analyst
+approves, the analyst acts.
 
-The application is deliberately split into two surfaces so the public demo stays simple
-while the internals remain examinable.
+## 2. Two routes only
 
-| | Public portal | Admin portal |
+| | Public portal | Administration |
 |---|---|---|
-| URL | `/` | `/admin` (typed manually — no link anywhere) |
+| URL | `/` | `/admin` (typed manually, not linked) |
 | Login | none | email + password |
-| Pages | Home, Investigate, Scenarios, Results | Dashboard, Knowledge base, Inference engine, Decision engine, Audit, System map |
-| Audience | analyst / examiner | you, during the viva |
+| Content | Home, Investigate, Scenarios, Results | Dashboard, Knowledge base, Inference engine, Decision engine, Audit, System map |
 
-Both surfaces call the same `rule_registry`, `inference_engine`, `decision_engine` and
-`simulation` code. The split is presentation only — there is no second reasoning path.
+`/` is a single page. Home, Investigate, Scenarios and Results are **sidebar sections**, not
+separate URLs. `/admin` is protected, hidden from the sidebar, and is the only place where
+rule identifiers and technical tables appear by default.
 
-The admin nav entry is hidden with CSS, so `Admin portal` never appears in the sidebar, the
-page list or any in-app button. Typing `/admin` is the only way in.
+## 3. What a run looks like
 
-## 3. The five Expert System components
+1. **Describe** — enter observations. Each boolean is True, False or **Unknown**, and Unknown
+   is not the same as False: a rule that needs an unknown fact will not fire.
+2. **Diagnose** — forward chaining fires rules until nothing new can be derived. Findings are
+   merged by conclusion, and the strongest severity wins.
+3. **Explain** — the Results section states the issue, the severity, the threat score and the
+   observations behind each conclusion, in sentences. Rule identifiers are not shown.
+4. **Approve** — every recommendation is a checkbox. Deferred recovery steps are listed
+   separately and cannot be approved while containment is open.
+5. **Receive the plan** — after approval, CIARES writes a numbered response plan and offers it
+   as a `.txt` download.
 
-| Component | Implementation | File |
-|---|---|---|
-| Knowledge Base | 5 modules of manually authored IF-THEN rules | `knowledge_base/` |
-| Inference Engine | Forward chaining to a fixed point, activation tracking | `engine/inference_engine.py` |
-| User Interface | Public portal + hidden admin portal | `app.py`, `ui/` |
-| Explanation Facility | Trace explanation, justification, "Why this finding?" | `engine/explanation_engine.py`, `ui/user/results.py` |
-| Knowledge Acquisition | Structural validation and registration of curated rules | `knowledge_base/knowledge_acquisition.py` |
+A collapsed **Technical evidence (administrative)** table on Results exposes the rule
+identifiers for audit. It is closed by default.
 
-Supporting components: working memory with True/False/Unknown facts, a decision engine with
-action priorities and conflict resolution, a simulated environment, predefined scenarios,
-SQLite persistence, a pytest suite and documentation.
+## 4. What ships
 
-## 4. Current status
-
-| Area | Status |
+| Item | Count |
 |---|---|
-| `models`, `working_memory`, `inference_engine` | complete and tested |
-| `knowledge_acquisition`, `rule_registry` | complete and tested |
-| `decision_engine`, `explanation_engine` | complete and tested |
-| Simulated environment + all 15 actions | complete and tested |
-| Public portal (4 pages) | complete |
-| Admin portal (6 tabs, login gate) | complete |
-| Knowledge base | **60 of 60 rules**, 85 logical conditions, 5 modules |
-| Scenarios SCN-001..006 | complete, all 60 rules reachable |
-| SQLite persistence + audit trail | complete |
-| Test suite | **111 passed, 0 skipped** |
-| Public deployment | pending (needs your Streamlit Cloud account) |
-| PDF + ZIP submission | deferred |
+| Rules | 60 (12 per module) |
+| Logical conditions | 85 |
+| Knowledge modules | 5 |
+| Distinct facts | 80 |
+| Predefined scenarios | 6 |
+| Response actions in the catalogue | 15 |
+| Automated tests | 106 |
 
-The engine is generic, so each new rule is a data addition: write the `Rule`, add a test, and
-it appears in the admin knowledge base, the inference engine and the scenario coverage
-automatically. See [section 9](#9-extending-the-knowledge-base).
+Modules: Authentication & Account Security, Malware & Process Security, Network Security,
+Data Security & Protection, Privilege & Security Policy.
 
-## 5. Architecture
+## 5. The five Expert System components
+
+| Component | Implementation |
+|---|---|
+| Knowledge Base | `knowledge_base/` — five modules of IF-THEN rules |
+| Inference Engine | `engine/inference_engine.py` — forward chaining to a fixed point |
+| User Interface | `app.py` (public) and `admin.py` (administration) |
+| Explanation Facility | `engine/report.py`, `engine/explanation_engine.py` |
+| Knowledge Acquisition | `knowledge_base/knowledge_acquisition.py` — validation and registration |
+
+Supporting pieces: three-valued working memory with provenance, a decision engine that turns
+findings into ordered recommendations, six scenarios, SQLite persistence and the test suite.
+
+## 6. Engine, in one diagram
 
 ```
-app.py (entry point: st.navigation only — no knowledge, no reasoning)
-  │
-  ├── ui/nav.py ── page registry (4 public pages + hidden /admin)
-  ├── ui/shared/ ── theme, session state, auth gate, password hashing
-  ├── ui/user/ ── home, investigate, scenarios, results
-  └── ui/admin/ ── dashboard, knowledge, inference, decision, audit, system_map
-        │
-        └── engine/pipeline.py ── run_investigation()
-              │
-              ├── engine/working_memory.py ── facts (True / False / Unknown) + provenance
-              ├── knowledge_base/rule_registry.py ── ALL_RULES (60 rules)
-              ├── engine/inference_engine.py ── forward chaining, activation tracking
-              ├── engine/decision_engine.py ── findings -> targeted response actions
-              ├── simulation/ ── simulated entities + 15 action handlers
-              └── engine/explanation_engine.py ── trace + justification + Markdown report
+app.py ── public portal (sections, prose, approval)
+admin.py ── administration (six tabs)
+   │
+   └── engine/pipeline.py :: run_investigation()
+         │
+         ├── engine/working_memory.py    True / False / Unknown facts + provenance
+         ├── knowledge_base/             ALL_RULES (60 rules, 85 conditions)
+         ├── engine/inference_engine.py  forward chaining, activation tracking
+         ├── engine/decision_engine.py   findings -> ordered recommendations
+         ├── engine/report.py            threat score, prose, approval, plan
+         └── engine/explanation_engine.py  admin tables and justifications
 
 storage/db.py ── SQLite (data/ciares.db): investigations + admin_events
 ```
 
-Key separation:
+Separation of concerns:
 
-* `knowledge_base/` defines **what CIARES knows**.
-* `engine/` defines **how CIARES reasons**.
-* `simulation/` performs **simulated responses**.
-* `ui/` lets a human **interact** with all of it.
-* `storage/` records what happened, for the admin portal only.
+* `knowledge_base/` — **what** CIARES knows.
+* `engine/` — **how** it reasons.
+* `theme.py`, `app.py`, `admin.py` — **how it is presented**.
+* `storage/` — **what happened**, for the audit trail.
 
-A full file-by-file map, including *what breaks if a module is removed*, is rendered inside
-the app at **Admin → System map** (`docs/system_map.md`).
-
-## 6. Installation and run
+## 7. Install and run
 
 Requires Python 3.10+ (developed on 3.13).
 
@@ -128,142 +124,99 @@ admin_email = "admin@ciares.local"
 admin_password_hash = "pbkdf2_sha256$260000$<salt>$<digest>"
 ```
 
-Generate a hash (never commit the plaintext password):
+Generate the hash — never commit the plaintext password:
 
 ```powershell
 python tools/hash_password.py
 ```
 
-Then run:
+Run:
 
 ```powershell
 streamlit run app.py
 ```
 
-Open <http://localhost:8501> for the public portal and <http://localhost:8501/admin> for the
-admin portal.
+Public portal: <http://localhost:8501>  ·  Administration: <http://localhost:8501/admin>
 
-Run the test suite:
+Test:
 
 ```powershell
-python -m pytest
+python -m pytest -q
 ```
 
-Expected: **111 passed, 0 skipped**. The suite includes a coverage test that fails if any of
-the 60 rules cannot fire in at least one shipped scenario.
+Expected: **106 passed**.
 
-## 7. Using the public portal
+## 8. Using the public portal
 
-1. **Home** — what CIARES does, the five modules, rule/condition counts and entry points.
-2. **Investigate** — enter observations. Booleans are True / False / **Unknown**. Response
-   targets are assigned automatically from the simulated inventory, so no identifiers are
-   typed.
-3. **Scenarios** — run SCN-001 (account compromise), SCN-002 (malware), SCN-003 (network
-   intrusion), SCN-004 (data exfiltration), SCN-005 (privilege abuse) or SCN-006 (credential
-   abuse + data integrity).
-4. **Results** — severity summary and chart, the diagnosis, a **Why this finding?** expander
-   per finding, every proposed action with its rationale, and the approve → execute step.
+* **Home** — what CIARES does, the five modules, the counts, and the two ways in.
+* **Investigate** — the observation form, grouped in five expanders with tri-state booleans.
+* **Scenarios** — SCN-001 account compromise, SCN-002 malware, SCN-003 network intrusion,
+  SCN-004 data exfiltration, SCN-005 privilege escalation, SCN-006 credential abuse and data
+  integrity. A scenario supplies observations only; the diagnosis comes from the same engine.
+* **Results** — threat meter (score 0-100 plus one sentence), the headline, the findings in
+  prose, "what led to this", the recommendations and the approval step, then the plan.
 
-Nothing on these pages exposes the rule catalogue or the activation trace.
+## 9. Using the administration portal
 
-## 8. Using the admin portal
-
-Navigate to `/admin` and sign in. Six tabs:
+Typing `/admin` is the only way in. After signing in:
 
 | Tab | What it shows |
 |---|---|
-| Dashboard | Cross-investigation statistics, findings by severity/module, KB health, recent admin activity, simulated inventory |
-| Knowledge base | All 60 rules, per-rule condition tables, machine-generated condition inventory |
-| Inference engine | Activation order, per-activation justification, working memory with provenance, reasoning log |
-| Decision engine | Decision rules, proposed actions, full action catalogue, **target validation lab** |
-| Audit | Every stored investigation with filters, per-record drill-down, JSON/CSV export, admin events |
-| System map | File responsibilities and impact-if-removed |
+| Dashboard | Runs, findings, approved actions, rules/conditions, charts, KB health, recent admin events |
+| Knowledge base | All 60 rules, per-rule conditions, condition inventory |
+| Inference engine | Activation order, justification per activation, working memory with provenance, reasoning log |
+| Decision engine | Decision rules, recommendations, full action catalogue |
+| Audit | Stored investigations with filters, per-record drill-down, JSON/CSV export, admin events |
+| System map | File responsibilities and impact if removed |
 
-The target validation lab is where the blocked-target demonstration now lives: type
-`USER-999` and the Decision Engine reports that the account does not exist in the simulated
-environment. The public portal never asks for an identifier.
-
-## 9. Extending the knowledge base
-
-The 60-rule catalogue is complete. To add or change a rule:
-
-1. Add/edit a `Rule(...)` object in the relevant module's tuple.
-2. Use fact keys consistently with `ui/schema.py` (`failed_login_attempts`,
-   `protected_file_modified`, ...).
-3. Prefer chaining: derive indicators with Tier 1 rules and combine them in Tier 2/3 rules.
-4. If the rule recommends a response, the action key must exist in
-   `engine/decision_engine.py` (`ACTION_LIBRARY`) and in `simulation/`.
-5. Run `python -m pytest`. `test_rules.py` validates structure, `test_scenarios.py` checks
-   the expected chains, and `test_coverage.py` fails if a rule cannot fire.
-
-Rules are validated automatically for: id format, uniqueness, description, at least one
-condition, no self-supporting conclusion, valid severity, approved source, and action/entity
-consistency.
+The admin portal is the only place that shows rule identifiers, traces and tables by default.
 
 ## 10. Folder structure
 
 ```
 CIARES/
-├── app.py                  entry point (st.navigation)
-├── config.py               thresholds, approved sources, paths
-├── requirements.txt
-├── ui/
-│   ├── nav.py              page registry, incl. the hidden /admin page
-│   ├── navigation.py       in-app page switching
-│   ├── schema.py           observation form metadata
-│   ├── shared/             theme, session state, auth, password hashing
-│   ├── user/               home, investigate, scenarios, results
-│   └── admin/              dashboard, knowledge, inference, decision, audit, system_map
-├── storage/
-│   └── db.py               SQLite schema, save/load, aggregates, admin events
+├── app.py                     public portal: routing, form, results, approval
+├── admin.py                   administration: login gate + six tabs
+├── theme.py                   Poppins, hero, cards, threat meter, footer
+├── passwords.py               PBKDF2 hashing and credential checks
+├── config.py                  thresholds, approved sources, paths
 ├── knowledge_base/
-│   ├── authentication.py   AUTH-01..12
-│   ├── malware.py          MAL-01..12
-│   ├── network.py          NET-01..12
-│   ├── data_security.py    DATA-01..12
-│   ├── security_policy.py  POL-01..12
-│   ├── rule_registry.py    assembles ALL_RULES
-│   └── knowledge_acquisition.py  validation + registration
+│   ├── authentication.py      AUTH-01..12
+│   ├── malware.py             MAL-01..12
+│   ├── network.py             NET-01..12
+│   ├── data_security.py       DATA-01..12
+│   ├── security_policy.py     POL-01..12
+│   ├── rule_registry.py       assembles ALL_RULES
+│   └── knowledge_acquisition.py  validation and registration
 ├── engine/
-│   ├── models.py           Rule, Condition, Fact, Finding, ResponseAction...
-│   ├── working_memory.py   facts, provenance, contradiction protection
-│   ├── inference_engine.py forward chaining
-│   ├── decision_engine.py  action library, target checks, conflicts
-│   ├── explanation_engine.py
-│   ├── entities.py         default targets from the simulated inventory
-│   └── pipeline.py         run_investigation()
-├── simulation/
-│   ├── environment.py      simulated entities + transitions
-│   ├── account_actions.py
-│   ├── network_actions.py
-│   ├── process_actions.py
-│   └── data_policy_actions.py
+│   ├── models.py              Rule, Condition, Fact, Finding, ResponseAction, Investigation
+│   ├── working_memory.py      facts, provenance, contradiction protection
+│   ├── inference_engine.py    forward chaining
+│   ├── decision_engine.py     action catalogue, conflicts, phase ordering
+│   ├── report.py              prose diagnosis, approval, response plan
+│   ├── explanation_engine.py  admin trace and justification
+│   └── pipeline.py            run_investigation()
 ├── scenarios/sample_scenarios.py   SCN-001..006
-├── tools/hash_password.py  PBKDF2 hash generator for the admin credential
-├── tests/                  original suite + storage, entities, auth tests
-└── docs/
-    ├── system_map.md       file responsibilities + impact-if-removed
-    ├── demo_guide.md       viva walkthrough
-    ├── rule_catalogue.md   all 60 rules, conditions, status
-    ├── rule_sources.md     NIST / CSF / ATT&CK / CISA mapping
-    └── technical_design.md algorithms and design decisions
+├── storage/db.py              SQLite schema, save/load, aggregates, admin events
+├── tools/hash_password.py     PBKDF2 hash generator
+├── tests/                     engine, rules, scenarios, storage, auth
+└── docs/                      system map, technical design, demo guide, rule catalogue
 ```
 
 ## 11. Storage
 
-Investigations are written to `data/ciares.db` (SQLite). Two tables:
+`data/ciares.db` holds two tables:
 
-* `investigations` — one row per run: summary columns for the dashboard plus the full JSON
-  payload needed to replay the reasoning.
-* `admin_events` — admin sign-in, sign-out and destructive actions.
+* `investigations` — one row per run: summary columns for the dashboard plus the JSON payload
+  needed to replay the reasoning and the approved plan.
+* `admin_events` — sign-in, sign-out and destructive actions.
 
-On Streamlit Community Cloud the filesystem is ephemeral: records survive while the container
-is awake and reset after a redeploy or a long sleep. The app states this on the dashboard
-rather than pretending the store is durable. `data/*.db` is git-ignored.
+On Streamlit Community Cloud the filesystem is ephemeral, so records survive while the
+container is awake and reset after a redeploy or a long sleep. `data/*.db` is git-ignored.
 
 ## 12. Threshold assumptions
 
-All numbers in `config.THRESHOLDS` are **project assumptions**, not universal standards:
+The numbers in `config.THRESHOLDS` are **project assumptions**, not universal standards:
 
 | Fact | Assumed threshold |
 |---|---|
@@ -274,37 +227,29 @@ All numbers in `config.THRESHOLDS` are **project assumptions**, not universal st
 | `transfer_volume_mb` | 1000 |
 | `download_count` | 100 |
 | `connection_attempts` | 20 |
-| `denied_requests` | 15 |
+| `denied_request_count` | 15 |
 
-## 13. Deployment
+The threat score is equally explicit: Critical 50, High 25, Medium 10, Low 5, capped at 100.
 
-1. Push this branch to GitHub.
-2. Create a Streamlit Community Cloud app pointing at `app.py`.
-3. Add the `[auth]` section to the app secrets (same keys as the local file above).
-4. Test the public URL and `/admin` in an incognito window and on another device.
+## 13. Limitations
 
-No other environment configuration is required — there is no external database or service.
-
-## 14. Limitations
-
-* Simulated responses only. CIARES never connects to a real system.
-* Manual knowledge acquisition: no learning, no external AI service.
-* Single-entity-focus per investigation (one account/session/process per run).
-* Numeric inputs are always considered provided; boolean inputs support Unknown.
-* Thresholds are illustrative and configurable, not audited standards.
+* Decision support only — CIARES reads observations and writes a plan; it never executes.
+* Manual knowledge acquisition: no learning and no external AI service.
+* Booleans support Unknown; numeric inputs are treated as provided.
+* Thresholds and the threat score are illustrative and configurable.
 * SQLite on Streamlit Community Cloud is ephemeral, as described in section 11.
 
-## 15. Submission checklist
+## 14. Submission checklist
 
-- [x] Working inference engine with activation tracking and fixed point
+- [x] Forward-chaining inference with activation tracking and a fixed point
 - [x] Three-valued working memory and fact provenance
-- [x] 60 rules / 85 logical conditions / 5 modules
-- [x] Decision engine with target validation and conflict handling
-- [x] Simulated execution for 15 actions
-- [x] Trace and justification explanations
-- [x] Public portal: Home, Investigate, Scenarios, Results
-- [x] Hidden admin portal with six tabs and a login gate
-- [x] SQLite persistence and admin audit trail
-- [x] Pytest suite (111 passed)
+- [x] 60 rules / 85 conditions / 5 modules
+- [x] Decision engine with deduplication, recovery deferral and phase ordering
+- [x] Prose diagnosis, threat score and human approval
+- [x] Written response plan with download
+- [x] Public portal at `/` with four sidebar sections
+- [x] Hidden administration portal at `/admin` with six tabs
+- [x] SQLite persistence and audit trail
+- [x] Pytest suite (106 passed)
 - [ ] Public Streamlit URL
 - [ ] PDF code explanation and ZIP submission (deferred)

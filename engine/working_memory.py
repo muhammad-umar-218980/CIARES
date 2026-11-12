@@ -31,8 +31,7 @@ class ContradictionError(ValueError):
 
 
 class WorkingMemory:
-    def __init__(self, entities: dict[str, str] | None = None) -> None:
-        self.entities: dict[str, str] = dict(entities or {})
+    def __init__(self) -> None:
         self._facts: dict[str, Fact] = {}
         self._sequence = 0
         self.trace: list[dict[str, Any]] = []
@@ -131,7 +130,6 @@ class WorkingMemory:
             sequence=sequence,
             rule=rule,
             evaluations=evaluations,
-            entities=dict(self.entities),
             conclusion_key=rule.conclusion_key,
             conclusion_label=rule.conclusion_label,
             conclusion_value=True,

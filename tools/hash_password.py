@@ -19,7 +19,7 @@ from __future__ import annotations
 import getpass
 import sys
 
-from ui.shared.passwords import hash_password
+from passwords import hash_password
 
 
 def main() -> None:

@@ -14,8 +14,8 @@ from pathlib import Path
 APP_NAME = "CIARES"
 APP_TAGLINE = "Cybersecurity Incident Analysis and Response Expert System"
 APP_DESCRIPTION = (
-    "A rule-based Expert System that investigates security incidents, derives "
-    "findings, recommends responses and executes them in a simulated environment."
+    "A rule-based Expert System that investigates security incidents, explains its "
+    "reasoning, recommends a response and writes a plan once a human approves it."
 )
 APP_VERSION = "2.0.0"
 

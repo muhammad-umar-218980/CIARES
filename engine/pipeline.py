@@ -1,10 +1,10 @@
 """
 The end-to-end investigation pipeline.
 
-This is the single function the Streamlit pages and the scenario tests call:
+This is the single function the Streamlit portal and the tests call:
 
     observations -> working memory -> forward chaining -> diagnosis
-                 -> decision engine -> Investigation (with simulated environment)
+                 -> decision engine -> Investigation
 
 Keeping the pipeline here (instead of inside ``app.py``) means the exact same
 reasoning runs for a manual investigation, a predefined scenario and a pytest
@@ -50,7 +50,6 @@ def build_findings(activations: Sequence[RuleActivation]) -> list[Finding]:
                 description=rule.description,
                 recommended_action=rule.recommended_action,
                 action_phase=rule.action_phase,
-                entity_type=rule.entity_type,
             )
             continue
 
@@ -64,32 +63,27 @@ def build_findings(activations: Sequence[RuleActivation]) -> list[Finding]:
         if existing.recommended_action is None and rule.recommended_action:
             existing.recommended_action = rule.recommended_action
             existing.action_phase = rule.action_phase
-            existing.entity_type = rule.entity_type
 
     return sorted(findings.values(), key=lambda finding: (-finding.severity.rank, finding.sequence))
 
 
 def run_investigation(
     observations: dict[str, Any],
-    entities: dict[str, str] | None = None,
     name: str = "Untitled Investigation",
     rules: Sequence = ALL_RULES,
-    environment=None,
     scenario_id: str | None = None,
     investigation_id: str | None = None,
     decision_engine: DecisionEngine | None = None,
 ) -> Investigation:
-    entities = {key: value for key, value in (entities or {}).items() if value}
     investigation = Investigation(
         id=investigation_id or _new_investigation_id(),
         name=name,
         started_at=datetime.now().isoformat(timespec="seconds"),
         observations={key: value for key, value in observations.items() if value is not None},
-        entities=entities,
         scenario_id=scenario_id,
     )
 
-    memory = WorkingMemory(entities)
+    memory = WorkingMemory()
     memory.add_observations(observations)
 
     inference = InferenceEngine(rules)
@@ -101,25 +95,12 @@ def run_investigation(
         f"{len(findings)} finding(s) derived from {result.activation_count} rule activation(s)",
     )
 
-    if environment is None:
-        from simulation.environment import SimulatedEnvironment
-
-        environment = SimulatedEnvironment()
-
-    # NOTE: entities named in an investigation are deliberately *not* created on
-    # demand. The simulated environment holds a fixed inventory, so a response
-    # aimed at a target that does not exist (e.g. USER-999) is rejected by the
-    # Decision Engine instead of being silently invented.
-
-    engine = decision_engine or DecisionEngine(environment)
-    mesh = getattr(engine, "environment", None)
-    if mesh is None:
-        engine.environment = environment
-    actions = engine.decide(findings, entities, investigation_id=investigation.id)
-    executable = sum(1 for action in actions if action.executable)
+    engine = decision_engine or DecisionEngine()
+    actions = engine.decide(findings, investigation_id=investigation.id)
+    deferred = sum(1 for action in actions if action.deferred)
     memory.record_trace(
         "decision",
-        f"{len(actions)} response action(s) proposed, {executable} executable",
+        f"{len(actions)} recommendation(s) produced, {deferred} deferred",
     )
 
     investigation.activations = list(result.activations)
@@ -128,8 +109,7 @@ def run_investigation(
     investigation.trace = list(memory.trace)
     investigation.terminated_reason = result.terminated_reason
     investigation.inference_cycles = result.cycles
-    investigation.environment = environment
-    investigation.memory = memory  # type: ignore[attr-defined]
+    investigation.memory = memory
     return investigation
 
 

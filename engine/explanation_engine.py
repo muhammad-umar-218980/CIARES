@@ -3,15 +3,14 @@ The Explanation Facility.
 
 Two kinds of explanation are produced, matching the lecture material:
 
-* Trace explanation       - the ordered sequence of rule activations and the
-                            conclusions they produced.
+* Trace explanation        - the ordered sequence of rule activations and the
+                             conclusions they produced.
 * Justification explanation - for a single activation, every condition with the
-                            observed value, whether it was satisfied, and, for
-                            actions, why the action was chosen and what happened
-                            when it was executed.
+                             observed value and whether it was satisfied.
 
-Nothing here re-runs the engine; it only interprets the records that the engine,
-the decision engine and the simulation already produced.
+Nothing here re-runs the engine; it only interprets the records the engine and
+the Decision Engine already produced. These tables are shown to administrators;
+the public portal uses :mod:`engine.report` for prose instead.
 """
 
 from __future__ import annotations
@@ -25,16 +24,14 @@ class ExplanationEngine:
     # -- trace --------------------------------------------------------------
     @staticmethod
     def trace_rows(investigation: Investigation) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        for step in investigation.trace:
-            rows.append(
-                {
-                    "Step": step["step"],
-                    "Event": step["kind"].title(),
-                    "Detail": step["message"],
-                }
-            )
-        return rows
+        return [
+            {
+                "Step": step["step"],
+                "Event": step["kind"].title(),
+                "Detail": step["message"],
+            }
+            for step in investigation.trace
+        ]
 
     @staticmethod
     def activation_rows(investigation: Investigation) -> list[dict[str, Any]]:
@@ -64,7 +61,6 @@ class ExplanationEngine:
             "source": rule.source,
             "conclusion_key": rule.conclusion_key,
             "conclusion_label": rule.conclusion_label,
-            "entities": dict(activation.entities),
             "conditions": [
                 {
                     "Condition": evaluation.condition.describe(),
@@ -98,22 +94,25 @@ class ExplanationEngine:
         )
         return "\n\n".join(header) + "\n\n" + "\n".join(table) + "\n\n" + closing
 
-    # -- actions ------------------------------------------------------------
+    # -- recommendations ----------------------------------------------------
     @staticmethod
     def action_rows(investigation: Investigation) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for action in investigation.actions:
+            if action.deferred:
+                status = "Deferred"
+            elif action.approved:
+                status = "Approved"
+            else:
+                status = "Awaiting approval"
             rows.append(
                 {
                     "ID": action.action_id,
                     "Phase": action.phase.value,
                     "Action": action.label,
-                    "Target": f"{action.target_type}:{action.target}",
                     "Finding": action.finding_label,
                     "Priority": action.priority,
-                    "Executable": "Yes" if action.executable else "No",
-                    "Status": action.status,
-                    "Blocked reason": action.blocked_reason,
+                    "Status": status,
                 }
             )
         return rows
@@ -122,23 +121,15 @@ class ExplanationEngine:
     def action_markdown(action: ResponseAction) -> str:
         paragraphs = [
             f"**{action.action_id} - {action.label}**",
-            f"*Phase:* {action.phase.value}  |  *Priority:* {action.priority}  |  "
-            f"*Target:* {action.target_type} `{action.target}`",
+            f"*Phase:* {action.phase.value}  |  *Priority:* {action.priority}",
             f"*Selected because:* {action.reason}",
         ]
-        if action.executable:
-            paragraphs.append("*Target check:* target exists and is in a valid state.")
+        if action.deferred:
+            paragraphs.append(f"*Deferred:* {action.defer_reason}")
+        elif action.approved:
+            paragraphs.append("*Approved by the analyst.*")
         else:
-            paragraphs.append(f"*Blocked:* {action.blocked_reason}")
-        if action.execution is not None:
-            execution = action.execution
-            paragraphs.append(
-                f"*Execution:* **{execution.status}** - {execution.message}"
-            )
-            if execution.before or execution.after:
-                paragraphs.append(
-                    f"*State change:* `{execution.before}` → `{execution.after}`"
-                )
+            paragraphs.append("*Awaiting analyst approval.*")
         return "\n\n".join(paragraphs)
 
     # -- report -------------------------------------------------------------
@@ -174,7 +165,7 @@ class ExplanationEngine:
                 f"{activation.conclusion_label} |"
             )
 
-        lines.extend(["", "## Response actions", ""])
+        lines.extend(["", "## Response recommendations", ""])
         for action in investigation.actions:
             lines.append(self.action_markdown(action))
             lines.append("")
@@ -183,8 +174,8 @@ class ExplanationEngine:
             [
                 "## Limitations",
                 "",
-                "All actions are executed against CIARES's internal simulated "
-                "environment. No real account, host, process or network is modified.",
+                "CIARES diagnoses, explains and recommends. It does not execute any "
+                "action; an approved response is carried out by a human analyst.",
             ]
         )
         return "\n".join(lines)

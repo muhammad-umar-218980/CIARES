@@ -12,7 +12,7 @@ module and the assumptions that are *not* standards.
 | **NIST Cybersecurity Framework 2.0** | February 2024 | Vocabulary of Identify / Protect / Detect / Respond / Recover; governance of security controls; continuous monitoring |
 | **MITRE ATT&CK** | Enterprise matrix (current) | Technique identifiers used to justify detection logic and to name observed attacker behaviour |
 | **CISA Guidance** | #StopRansomware Guide, Incident & Vulnerability Response playbooks | Practical containment priorities, disabling compromised accounts, isolating endpoints, escalating to a human owner |
-| **CIARES Project Assumption** | - | Numeric thresholds, working-hours definition and simulation state names |
+| **CIARES Project Assumption** | - | Numeric thresholds, the working-hours definition, response phases and the threat-score weights |
 
 Threshold values are collected in `config.THRESHOLDS` and are deliberately easy to change.
 They must be presented as **project assumptions**, not as universal cybersecurity limits.

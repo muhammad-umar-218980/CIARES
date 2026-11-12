@@ -26,7 +26,6 @@ def _investigation():
             "login_to_disabled_account": False,
             "is_admin_account": True,
         },
-        entities={"account_id": "USER-101", "session_id": "SESSION-204"},
         name="Storage round-trip",
     )
 
@@ -75,6 +74,23 @@ def test_record_contains_derived_provenance():
     derived = {item["key"]: item for item in record["derived"]}
     assert "possible_account_compromise" in derived
     assert derived["possible_account_compromise"]["rule_id"] == "AUTH-04"
+
+
+def test_approval_is_persisted():
+    from engine.report import approve
+
+    investigation = _investigation()
+    db.save_investigation(investigation)
+    action = investigation.actions[0]
+
+    approve(investigation, [action.action_id])
+    db.save_investigation(investigation)
+
+    rows = db.list_investigations()
+    assert rows[0]["approved"] == 1
+    loaded = db.load_investigation(investigation.id)
+    assert loaded is not None
+    assert [item.action for item in loaded.approved_actions] == [action.action]
 
 
 def test_stats_aggregate_across_records():

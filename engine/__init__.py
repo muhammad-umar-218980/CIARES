@@ -3,7 +3,6 @@
 from .models import (  # noqa: F401
     Condition,
     ConditionEvaluation,
-    ExecutionResult,
     Fact,
     Finding,
     Investigation,

@@ -3,9 +3,9 @@ SQLite persistence for CIARES.
 
 The Expert System keeps two records only:
 
-* ``investigations`` - one row per completed investigation. The row carries the
-  columns the admin dashboard aggregates over plus the full JSON payload needed
-  to replay an investigation in the admin portal.
+* ``investigations`` - one row per investigation. The row carries the columns the
+  admin dashboard aggregates over plus the full JSON payload needed to replay an
+  investigation in the admin portal.
 * ``admin_events``   - a small audit trail of admin sign-in activity.
 
 Nothing in this module reasons about security incidents. It stores what the
@@ -28,7 +28,6 @@ from typing import Any, Iterator
 from config import DB_PATH
 from engine.models import (
     ConditionEvaluation,
-    ExecutionResult,
     Finding,
     Investigation,
     Phase,
@@ -36,6 +35,7 @@ from engine.models import (
     RuleActivation,
     Severity,
 )
+from engine.report import threat_score
 from knowledge_base.rule_registry import get_rule
 
 # Tests point this at a temporary file; the app uses the configured path.
@@ -55,7 +55,8 @@ CREATE TABLE IF NOT EXISTS investigations (
     medium_count      INTEGER NOT NULL DEFAULT 0,
     low_count         INTEGER NOT NULL DEFAULT 0,
     action_count      INTEGER NOT NULL DEFAULT 0,
-    executed_count    INTEGER NOT NULL DEFAULT 0,
+    approved_count    INTEGER NOT NULL DEFAULT 0,
+    score             INTEGER NOT NULL DEFAULT 0,
     terminated_reason TEXT,
     payload           TEXT NOT NULL
 );
@@ -119,88 +120,11 @@ def _payload(investigation: Investigation) -> dict[str, Any]:
             for fact in memory.derived_facts()
         ]
 
-    return {
-        "id": investigation.id,
-        "name": investigation.name,
-        "started_at": investigation.started_at,
-        "scenario_id": investigation.scenario_id,
-        "observations": dict(investigation.observations),
-        "entities": dict(investigation.entities),
-        "findings": [
-            {
-                "key": finding.key,
-                "label": finding.label,
-                "severity": finding.severity.value,
-                "module": finding.module,
-                "rule_ids": list(finding.rule_ids),
-                "supporting_facts": list(finding.supporting_facts),
-                "sequence": finding.sequence,
-                "description": finding.description,
-                "recommended_action": finding.recommended_action,
-                "action_phase": finding.action_phase.value,
-                "entity_type": finding.entity_type,
-            }
-            for finding in investigation.findings
-        ],
-        "activations": [
-            {
-                "sequence": activation.sequence,
-                "rule_id": activation.rule.id,
-                "activation_key": activation.activation_key,
-                "conclusion_key": activation.conclusion_key,
-                "conclusion_label": activation.conclusion_label,
-                "conclusion_value": activation.conclusion_value,
-                "inserted_new_fact": activation.inserted_new_fact,
-                "entities": dict(activation.entities),
-                "evaluations": [
-                    {
-                        "known": evaluation.known,
-                        "observed": evaluation.observed,
-                        "satisfied": evaluation.satisfied,
-                        "note": evaluation.note,
-                    }
-                    for evaluation in activation.evaluations
-                ],
-            }
-            for activation in investigation.activations
-        ],
-        "actions": [
-            {
-                "action": action.action,
-                "action_id": action.action_id,
-                "label": action.label,
-                "phase": action.phase.value,
-                "priority": action.priority,
-                "target_type": action.target_type,
-                "target_id": action.target_id,
-                "finding_key": action.finding_key,
-                "finding_label": action.finding_label,
-                "finding_severity": action.finding_severity.value,
-                "reason": action.reason,
-                "executable": action.executable,
-                "blocked_reason": action.blocked_reason,
-                "status": action.status,
-                "execution": None
-                if action.execution is None
-                else {
-                    "action": action.execution.action,
-                    "label": action.execution.label,
-                    "target_type": action.execution.target_type,
-                    "target_id": action.execution.target_id,
-                    "success": action.execution.success,
-                    "message": action.execution.message,
-                    "before": action.execution.before,
-                    "after": action.execution.after,
-                    "timestamp": action.execution.timestamp,
-                },
-            }
-            for action in investigation.actions
-        ],
-        "trace": list(investigation.trace),
-        "terminated_reason": investigation.terminated_reason,
-        "inference_cycles": investigation.inference_cycles,
-        "derived": derived,
-    }
+    record = investigation.to_record()
+    record["inference_cycles"] = investigation.inference_cycles
+    record["derived"] = derived
+    record["score"] = threat_score(investigation)
+    return record
 
 
 def _findings_from(record: dict[str, Any]) -> list[Finding]:
@@ -216,7 +140,6 @@ def _findings_from(record: dict[str, Any]) -> list[Finding]:
             description=item.get("description", ""),
             recommended_action=item.get("recommended_action"),
             action_phase=Phase(item.get("action_phase", "Escalation")),
-            entity_type=item.get("entity_type"),
         )
         for item in record.get("findings", [])
     ]
@@ -241,7 +164,6 @@ def _activations_from(record: dict[str, Any]) -> list[RuleActivation]:
                 sequence=int(item["sequence"]),
                 rule=rule,
                 evaluations=evaluations,
-                entities=dict(item.get("entities", {})),
                 conclusion_key=item.get("conclusion_key", rule.conclusion_key),
                 conclusion_label=item.get("conclusion_label", rule.conclusion_label),
                 conclusion_value=item.get("conclusion_value", True),
@@ -253,52 +175,34 @@ def _activations_from(record: dict[str, Any]) -> list[RuleActivation]:
 
 
 def _actions_from(record: dict[str, Any]) -> list[ResponseAction]:
-    actions: list[ResponseAction] = []
-    for item in record.get("actions", []):
-        execution = item.get("execution")
-        actions.append(
-            ResponseAction(
-                action=item["action"],
-                label=item["label"],
-                phase=Phase(item["phase"]),
-                priority=int(item.get("priority", 99)),
-                target_type=item["target_type"],
-                target_id=item.get("target_id"),
-                finding_key=item.get("finding_key", ""),
-                finding_label=item.get("finding_label", ""),
-                finding_severity=Severity(item.get("finding_severity", "Low")),
-                reason=item.get("reason", ""),
-                executable=bool(item.get("executable", True)),
-                blocked_reason=item.get("blocked_reason", ""),
-                status=item.get("status", "Proposed"),
-                execution=None
-                if not execution
-                else ExecutionResult(
-                    action=execution["action"],
-                    label=execution["label"],
-                    target_type=execution["target_type"],
-                    target_id=execution.get("target_id"),
-                    success=bool(execution["success"]),
-                    message=execution.get("message", ""),
-                    before=execution.get("before", ""),
-                    after=execution.get("after", ""),
-                    timestamp=execution.get("timestamp", ""),
-                ),
-                action_id=item.get("action_id", ""),
-            )
+    return [
+        ResponseAction(
+            action=item["action"],
+            label=item["label"],
+            phase=Phase(item["phase"]),
+            priority=int(item.get("priority", 99)),
+            finding_key=item.get("finding_key", ""),
+            finding_label=item.get("finding_label", ""),
+            finding_severity=Severity(item.get("finding_severity", "Low")),
+            reason=item.get("reason", ""),
+            action_id=item.get("action_id", ""),
+            approved=bool(item.get("approved", False)),
+            deferred=bool(item.get("deferred", False)),
+            defer_reason=item.get("defer_reason", ""),
         )
-    return actions
+        for item in record.get("actions", [])
+    ]
 
 
 def rehydrate(record: dict[str, Any]) -> Investigation:
-    """Rebuild an Investigation from a stored payload (no environment attached)."""
+    """Rebuild an Investigation from a stored payload."""
     investigation = Investigation(
         id=record["id"],
         name=record.get("name", ""),
         started_at=record.get("started_at", ""),
         observations=dict(record.get("observations", {})),
-        entities=dict(record.get("entities", {})),
         scenario_id=record.get("scenario_id"),
+        approved_at=record.get("approved_at", ""),
         terminated_reason=record.get("terminated_reason", "completed"),
         inference_cycles=int(record.get("inference_cycles", 0)),
     )
@@ -315,11 +219,9 @@ def rehydrate(record: dict[str, Any]) -> Investigation:
 def save_investigation(
     investigation: Investigation, path: Path | str | None = None
 ) -> None:
-    """Insert or replace one investigation. Called after every run and execution."""
+    """Insert or replace one investigation (also used after approval)."""
     record = _payload(investigation)
-    counts = {severity.value: 0 for severity in Severity}
-    for finding in investigation.findings:
-        counts[finding.severity.value] += 1
+    counts = investigation.severity_counts
 
     with _connect(path) as connection:
         connection.execute(
@@ -328,8 +230,8 @@ def save_investigation(
                 id, created_at, name, source, scenario_id,
                 activation_count, finding_count,
                 critical_count, high_count, medium_count, low_count,
-                action_count, executed_count, terminated_reason, payload
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                action_count, approved_count, score, terminated_reason, payload
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 investigation.id,
@@ -344,7 +246,8 @@ def save_investigation(
                 counts["Medium"],
                 counts["Low"],
                 len(investigation.actions),
-                len(investigation.executed_actions),
+                len(investigation.approved_actions),
+                threat_score(investigation),
                 investigation.terminated_reason,
                 json.dumps(record, indent=2),
             ),
@@ -379,7 +282,7 @@ def list_investigations(
     query = f"""
         SELECT id, created_at, name, source, scenario_id,
                activation_count, finding_count, critical_count, high_count,
-               medium_count, low_count, action_count, executed_count,
+               medium_count, low_count, action_count, approved_count, score,
                terminated_reason
         FROM investigations
         {where}
@@ -404,7 +307,8 @@ def list_investigations(
             "Medium": row["medium_count"],
             "Low": row["low_count"],
             "actions": row["action_count"],
-            "executed": row["executed_count"],
+            "approved": row["approved_count"],
+            "score": row["score"],
             "terminated_reason": row["terminated_reason"],
         }
         for row in rows
@@ -442,7 +346,9 @@ def stats(path: Path | str | None = None) -> dict[str, Any]:
                    COALESCE(SUM(high_count), 0)     AS high,
                    COALESCE(SUM(medium_count), 0)   AS medium,
                    COALESCE(SUM(low_count), 0)      AS low,
-                   COALESCE(SUM(executed_count), 0) AS executed
+                   COALESCE(SUM(action_count), 0)   AS actions,
+                   COALESCE(SUM(approved_count), 0) AS approved,
+                   COALESCE(AVG(score), 0)          AS average_score
             FROM investigations
             """
         ).fetchone()
@@ -458,7 +364,9 @@ def stats(path: Path | str | None = None) -> dict[str, Any]:
             module = finding.get("module", "Unknown")
             modules[module] = modules.get(module, 0) + 1
 
-    summary = {key: int(totals[key]) for key in totals.keys()}
+    summary = {key: int(totals[key]) for key in ("investigations", "findings", "critical",
+                                                 "high", "medium", "low", "actions", "approved")}
+    summary["average_score"] = round(float(totals["average_score"] or 0), 1)
     summary["by_module"] = modules
     return summary
 

@@ -6,8 +6,8 @@ Algorithm (one cycle = one rule firing):
     1. Evaluate every rule against working memory.
     2. A rule is ELIGIBLE only when every one of its conditions is satisfied.
        A condition that is Unknown makes the rule ineligible (never "assume").
-    3. Build an activation key from rule id + entities + the exact supporting
-       facts, and discard any key that already fired.
+    3. Build an activation key from rule id + the exact supporting facts, and
+       discard any key that already fired.
     4. Fire the highest-priority eligible rule, insert its conclusion and
        record the activation.
     5. Repeat from step 1 until no eligible activation remains (fixed point).
@@ -71,21 +71,19 @@ class InferenceEngine:
     @staticmethod
     def activation_key(
         rule: Rule,
-        entities: dict[str, str],
         evaluations: Iterable[ConditionEvaluation],
     ) -> str:
         """
-        Rule id + relevant entity ids + the exact supporting fact combination.
+        Rule id + the exact supporting fact combination.
 
-        This is why AUTH-01 cannot fire ten times against the same observations,
-        while still being able to fire once for USER-101 and once for USER-202.
+        This is why a rule cannot fire twice against the same observations, while
+        still being allowed to fire again when the supporting facts change.
         """
-        entity_part = "|".join(f"{key}={value}" for key, value in sorted(entities.items()))
         support_part = "|".join(
             f"{evaluation.condition.field}={evaluation.observed!r}"
             for evaluation in evaluations
         )
-        return f"{rule.id}::{entity_part}::{support_part}"
+        return f"{rule.id}::{support_part}"
 
     def eligible_activations(
         self, memory: WorkingMemory, fired: set[str]
@@ -95,7 +93,7 @@ class InferenceEngine:
             is_eligible, evaluations = self.evaluate_rule(rule, memory)
             if not is_eligible:
                 continue
-            key = self.activation_key(rule, memory.entities, evaluations)
+            key = self.activation_key(rule, evaluations)
             if key in fired:
                 continue
             eligible.append((rule, evaluations, key))
@@ -121,18 +119,6 @@ class InferenceEngine:
                 break
 
             rule, evaluations, key = eligible[0]
-            target = next(
-                (
-                    evaluation.condition.field
-                    for evaluation in evaluations
-                    if evaluation.condition.field
-                    and evaluation.condition.field.endswith("_id")
-                ),
-                None,
-            )
-            if target is None and rule.entity_type:
-                target = f"{rule.entity_type}_id"
-
             inserted = memory.infer(
                 rule.conclusion_key,
                 True,

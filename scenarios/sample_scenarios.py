@@ -1,14 +1,14 @@
 """
 Predefined investigation scenarios.
 
-A scenario supplies OBSERVATIONS and ENTITY IDENTIFIERS only. It never supplies
-the diagnosis or a hardcoded response - the same inference engine, decision
-engine and simulated environment process both scenarios and manual input.
+A scenario supplies OBSERVATIONS only. It never supplies the diagnosis or a
+hardcoded response - the same inference engine and decision engine process both
+scenarios and manual input.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -18,7 +18,6 @@ class Scenario:
     name: str
     summary: str
     observations: dict[str, Any]
-    entities: dict[str, str] = field(default_factory=dict)
     expected_findings: tuple[str, ...] = ()
 
 
@@ -36,7 +35,6 @@ SCN_001 = Scenario(
         "login_to_disabled_account": False,
         "is_admin_account": True,
     },
-    entities={"account_id": "USER-101", "session_id": "SESSION-204"},
     expected_findings=(
         "repeated_authentication_failures",
         "suspicious_login_sequence",
@@ -63,12 +61,6 @@ SCN_002 = Scenario(
         "security_log_cleared": True,
         "executable_hash_known": False,
         "file_in_temp_directory": True,
-    },
-    entities={
-        "account_id": "USER-101",
-        "process_id": "PROCESS-401",
-        "file_id": "FILE-501",
-        "endpoint_id": "ENDPOINT-701",
     },
     expected_findings=(
         "unapproved_process",
@@ -97,12 +89,6 @@ SCN_003 = Scenario(
         "unexpected_listening_service": True,
         "denied_request_count": 25,
     },
-    entities={
-        "account_id": "USER-101",
-        "connection_id": "CONN-801",
-        "destination_id": "DEST-901",
-        "endpoint_id": "ENDPOINT-701",
-    },
     expected_findings=(
         "unauthorized_destination_access",
         "unusual_outgoing_traffic",
@@ -127,7 +113,6 @@ SCN_004 = Scenario(
         "sensitive_file_shared_externally": True,
         "access_outside_permitted_hours": True,
     },
-    entities={"account_id": "USER-101", "transfer_id": "TRANSFER-301"},
     expected_findings=(
         "unusual_data_transfer",
         "unauthorized_transfer_destination",
@@ -158,7 +143,6 @@ SCN_005 = Scenario(
         "successful_login_after_failures": True,
         "unusual_login_location": True,
     },
-    entities={"account_id": "USER-101", "session_id": "SESSION-204"},
     expected_findings=(
         "unauthorized_privilege_assignment",
         "possible_account_compromise",
@@ -191,7 +175,6 @@ SCN_006 = Scenario(
         "data_modified_without_approval": True,
         "protected_data_deleted": True,
     },
-    entities={"account_id": "USER-101", "session_id": "SESSION-204"},
     expected_findings=(
         "disabled_account_access_attempt",
         "off_hours_admin_login",

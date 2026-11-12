@@ -5,7 +5,6 @@ __pycache__/
 venv/
 env/
 .streamlit/secrets.toml
-data/investigations.json
 data/*.db
 data/*.db-wal
 data/*.db-shm

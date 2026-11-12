@@ -1,6 +1,9 @@
 """
-Decision Engine tests: action selection, target validation, duplicate collapsing
-and containment/recovery conflict resolution.
+Decision Engine tests: recommendation selection, duplicate collapsing,
+containment/recovery deferral and phase ordering.
+
+The Decision Engine is pure policy. It never validates a target or executes
+anything, because CIARES advises a human and does not act on a real network.
 """
 
 from __future__ import annotations
@@ -8,14 +11,12 @@ from __future__ import annotations
 from engine.decision_engine import ACTION_LIBRARY, DecisionEngine
 from engine.models import Finding, Phase, Severity
 from knowledge_base.rule_registry import ALL_RULES
-from simulation import ALL_ACTIONS, SimulatedEnvironment
 
 
 def finding(
     key: str,
     *,
     action: str | None = "disable_account",
-    entity_type: str | None = "account",
     severity: Severity = Severity.CRITICAL,
     sequence: int = 1,
     phase: Phase = Phase.CONTAINMENT,
@@ -29,117 +30,102 @@ def finding(
         sequence=sequence,
         recommended_action=action,
         action_phase=phase,
-        entity_type=entity_type,
     )
 
 
-def test_finding_produces_a_targeted_containment_action():
-    actions = DecisionEngine(SimulatedEnvironment()).decide(
-        [finding("possible_account_compromise")], {"account_id": "USER-101"}
-    )
+def test_actionable_finding_produces_a_recommendation():
+    actions = DecisionEngine().decide([finding("possible_account_compromise")])
+
     assert len(actions) == 1
     action = actions[0]
     assert action.action == "disable_account"
-    assert action.target_id == "USER-101"
     assert action.phase is Phase.CONTAINMENT
-    assert action.executable is True
+    assert action.action_id == "ACT-001"
+    assert action.approved is False
+    assert action.deferred is False
     assert "possible account compromise" in action.reason.lower()
 
 
-def test_findings_without_a_recommended_action_produce_no_response():
-    actions = DecisionEngine(SimulatedEnvironment()).decide(
-        [finding("repeated_authentication_failures", action=None, entity_type=None)],
-        {"account_id": "USER-101"},
-    )
+def test_diagnostic_only_finding_produces_nothing():
+    actions = DecisionEngine().decide([finding("repeated_authentication_failures", action=None)])
     assert actions == []
 
 
-def test_missing_target_identifier_blocks_the_action():
-    actions = DecisionEngine(SimulatedEnvironment()).decide(
-        [finding("possible_account_compromise")], {}
+def test_duplicate_actions_are_collapsed_and_keep_the_strongest_severity():
+    actions = DecisionEngine().decide(
+        [
+            finding("first_reason", severity=Severity.MEDIUM, sequence=1),
+            finding("second_reason", severity=Severity.CRITICAL, sequence=2),
+        ]
     )
-    assert actions[0].executable is False
-    assert "identifier" in actions[0].blocked_reason
 
-
-def test_non_existent_target_blocks_the_action():
-    actions = DecisionEngine(SimulatedEnvironment()).decide(
-        [finding("possible_account_compromise")], {"account_id": "USER-999"}
-    )
-    assert actions[0].executable is False
-    assert "does not exist" in actions[0].blocked_reason
-
-
-def test_target_in_wrong_state_blocks_the_action():
-    environment = SimulatedEnvironment()
-    environment.transition("account", "USER-101", "Disabled", {"Active"})
-    actions = DecisionEngine(environment).decide(
-        [finding("possible_account_compromise")], {"account_id": "USER-101"}
-    )
-    assert actions[0].executable is False
-    assert "Disabled" in actions[0].blocked_reason
-
-
-def test_duplicate_actions_are_collapsed_into_one():
-    duplicate = finding("account_compromise_indicator", sequence=2)
-    actions = DecisionEngine(SimulatedEnvironment()).decide(
-        [finding("possible_account_compromise", sequence=1), duplicate],
-        {"account_id": "USER-101"},
-    )
     assert len(actions) == 1
-    assert "also recommended" in actions[0].reason
+    action = actions[0]
+    assert action.finding_severity is Severity.CRITICAL
+    assert "first reason" in action.reason.lower()
+    assert "second reason" in action.reason.lower()
 
 
-def test_recovery_is_suppressed_when_containment_targets_the_same_account():
-    environment = SimulatedEnvironment()
-    environment.transition("account", "USER-101", "Elevated", {"Approved"}, field="permissions")
-    contain = finding("possible_account_compromise", sequence=1)
-    recover = finding(
-        "permission_violation",
-        action="restore_permissions",
-        sequence=2,
-        phase=Phase.RECOVERY,
-        severity=Severity.HIGH,
+def test_recovery_is_deferred_while_containment_is_open():
+    actions = DecisionEngine().decide(
+        [
+            finding("contained", action="disable_account", phase=Phase.CONTAINMENT),
+            finding("recover", action="restore_account", phase=Phase.RECOVERY, sequence=2),
+        ]
     )
-    actions = DecisionEngine(environment).decide(
-        [contain, recover], {"account_id": "USER-101"}
+
+    recovery = next(action for action in actions if action.action == "restore_account")
+    assert recovery.deferred is True
+    assert recovery.is_applicable is False
+    assert "containment" in recovery.defer_reason.lower()
+
+
+def test_recovery_is_not_deferred_when_there_is_no_containment():
+    actions = DecisionEngine().decide(
+        [finding("recover", action="restore_account", phase=Phase.RECOVERY)]
     )
-    recovery = next(action for action in actions if action.action == "restore_permissions")
-    assert recovery.executable is False
-    assert recovery.status == "Skipped"
-    assert "containment" in recovery.blocked_reason.lower()
+    assert actions[0].deferred is False
 
 
 def test_actions_are_ordered_by_phase_then_priority():
-    actions = DecisionEngine(SimulatedEnvironment()).decide(
+    actions = DecisionEngine().decide(
         [
-            finding("a", action="restore_account", phase=Phase.RECOVERY, sequence=1),
-            finding("b", action="revoke_session", entity_type="session", sequence=2),
-            finding("c", action="disable_account", sequence=3),
-        ],
-        {"account_id": "USER-101", "session_id": "SESSION-204"},
+            finding("escalate", action="escalate_to_analyst", phase=Phase.ESCALATION),
+            finding("quarantine", action="quarantine_file", phase=Phase.ERADICATION, sequence=2),
+            finding("disable", action="disable_account", phase=Phase.CONTAINMENT, sequence=3),
+            finding("revoke", action="revoke_session", phase=Phase.CONTAINMENT, sequence=4),
+        ]
     )
-    phases = [action.phase.order for action in actions]
-    assert phases == sorted(phases)
-    assert [action.action for action in actions][0] == "disable_account"
+
+    assert [action.action for action in actions] == [
+        "disable_account",
+        "revoke_session",
+        "quarantine_file",
+        "escalate_to_analyst",
+    ]
+    assert [action.action_id for action in actions] == [
+        "ACT-001",
+        "ACT-002",
+        "ACT-003",
+        "ACT-004",
+    ]
 
 
-# ---------------------------------------------------------------------------
-# Catalogue consistency
-# ---------------------------------------------------------------------------
-def test_action_library_and_simulation_handlers_agree():
-    assert set(ACTION_LIBRARY) == set(ALL_ACTIONS)
-
-
-def test_every_recommended_action_in_the_knowledge_base_is_implemented():
-    for rule in ALL_RULES:
-        if rule.recommended_action:
-            assert rule.recommended_action in ACTION_LIBRARY, rule.id
-            assert rule.recommended_action in ALL_ACTIONS, rule.id
-
-
-def test_action_identifiers_are_formatted():
-    actions = DecisionEngine(SimulatedEnvironment()).decide(
-        [finding("possible_account_compromise")], {"account_id": "USER-101"}
+def test_every_actionable_rule_names_a_known_action():
+    unknown = sorted(
+        {
+            rule.recommended_action
+            for rule in ALL_RULES
+            if rule.recommended_action and rule.recommended_action not in ACTION_LIBRARY
+        }
     )
-    assert actions[0].action_id.startswith("ACT-")
+    assert unknown == [], f"actions missing from the catalogue: {unknown}"
+
+
+def test_every_catalogue_action_has_a_phase_and_a_description():
+    for key, spec in ACTION_LIBRARY.items():
+        assert spec.key == key
+        assert spec.label
+        assert isinstance(spec.phase, Phase)
+        assert spec.priority >= 1
+        assert spec.description.endswith("."), key

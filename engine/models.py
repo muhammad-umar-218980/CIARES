@@ -2,8 +2,13 @@
 Standard data structures used throughout CIARES.
 
 The Expert System components must communicate using consistent objects, so
-everything (rules, facts, findings, actions, executions) is defined here and
-imported everywhere else. No logic lives in this module - it is pure structure.
+everything (rules, facts, findings, recommendations) is defined here and
+imported everywhere else. No reasoning lives in this module - it is pure
+structure.
+
+There is deliberately no execution object: CIARES produces a diagnosis, a set
+of recommendations and a written response plan. Acting on a real network is
+out of scope.
 """
 
 from __future__ import annotations
@@ -81,7 +86,7 @@ class Condition:
     """
     One logical condition inside an IF-THEN rule, e.g. failed_login_attempts >= 10.
 
-    ``label`` is the human wording used by the Explanation Facility; when it is
+    ``label`` is the human wording used by the explanation output; when it is
     empty the condition describes itself.
     """
 
@@ -155,7 +160,7 @@ class Rule:
 
     A rule is a *diagnostic* rule when it derives an indicator and an
     *actionable* rule when it also recommends a response. Only rules with a
-    ``recommended_action`` can create a response action; every rule still
+    ``recommended_action`` can create a recommendation; every rule still
     produces a finding.
     """
 
@@ -170,7 +175,6 @@ class Rule:
     source: str
     recommended_action: str | None = None
     action_phase: Phase = Phase.ESCALATION
-    entity_type: str | None = None
     priority: int = 100
     tags: tuple[str, ...] = ()
 
@@ -239,7 +243,6 @@ class RuleActivation:
     sequence: int
     rule: Rule
     evaluations: tuple[ConditionEvaluation, ...]
-    entities: dict[str, str]
     conclusion_key: str
     conclusion_label: str
     conclusion_value: Any
@@ -262,62 +265,39 @@ class Finding:
     description: str = ""
     recommended_action: str | None = None
     action_phase: Phase = Phase.ESCALATION
-    entity_type: str | None = None
-
-
-@dataclass
-class ExecutionResult:
-    """Outcome of one simulated action against the simulated environment."""
-
-    action: str
-    label: str
-    target_type: str
-    target_id: str | None
-    success: bool
-    message: str
-    before: str = ""
-    after: str = ""
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
-
-    @property
-    def status(self) -> str:
-        return "Success" if self.success else "Rejected"
 
 
 @dataclass
 class ResponseAction:
-    """An action proposed by the Decision Engine for a specific finding."""
+    """A response recommended by the Decision Engine for one or more findings."""
 
     action: str
     label: str
     phase: Phase
     priority: int
-    target_type: str
-    target_id: str | None
     finding_key: str
     finding_label: str
     finding_severity: Severity
     reason: str
-    executable: bool = True
-    blocked_reason: str = ""
-    status: str = "Proposed"  # Proposed | Executed | Rejected | Skipped
-    execution: ExecutionResult | None = None
     action_id: str = ""
+    approved: bool = False
+    deferred: bool = False
+    defer_reason: str = ""
 
     @property
-    def target(self) -> str:
-        return self.target_id or "(no target)"
+    def is_applicable(self) -> bool:
+        """A recommendation can be approved unless it is deferred."""
+        return not self.deferred
 
 
 @dataclass
 class Investigation:
-    """A complete investigation: inputs, reasoning, findings and responses."""
+    """A complete investigation: inputs, reasoning, findings and recommendations."""
 
     id: str
     name: str
     started_at: str
     observations: dict[str, Any]
-    entities: dict[str, str] = field(default_factory=dict)
     activations: list[RuleActivation] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
     actions: list[ResponseAction] = field(default_factory=list)
@@ -325,7 +305,8 @@ class Investigation:
     terminated_reason: str = "completed"
     inference_cycles: int = 0
     scenario_id: str | None = None
-    environment: Any = None  # SimulatedEnvironment, excluded from JSON records
+    approved_at: str = ""
+    memory: Any = None  # WorkingMemory, kept out of JSON records
 
     @property
     def severity_counts(self) -> dict[str, int]:
@@ -335,18 +316,22 @@ class Investigation:
         return counts
 
     @property
-    def executed_actions(self) -> list[ResponseAction]:
-        return [action for action in self.actions if action.execution is not None]
+    def approved_actions(self) -> list[ResponseAction]:
+        return [action for action in self.actions if action.approved]
+
+    @property
+    def deferred_actions(self) -> list[ResponseAction]:
+        return [action for action in self.actions if action.deferred]
 
     def to_record(self) -> dict[str, Any]:
-        """JSON-safe summary used by the Investigation History page."""
+        """JSON-safe summary used by the admin audit and the response plan."""
         return {
             "id": self.id,
             "name": self.name,
             "started_at": self.started_at,
             "scenario_id": self.scenario_id,
-            "observations": {k: v for k, v in self.observations.items()},
-            "entities": dict(self.entities),
+            "approved_at": self.approved_at,
+            "observations": dict(self.observations),
             "findings": [
                 {
                     "key": finding.key,
@@ -354,6 +339,11 @@ class Investigation:
                     "severity": finding.severity.value,
                     "module": finding.module,
                     "rule_ids": list(finding.rule_ids),
+                    "supporting_facts": list(finding.supporting_facts),
+                    "sequence": finding.sequence,
+                    "description": finding.description,
+                    "recommended_action": finding.recommended_action,
+                    "action_phase": finding.action_phase.value,
                 }
                 for finding in self.findings
             ],
@@ -362,26 +352,37 @@ class Investigation:
                     "sequence": activation.sequence,
                     "rule_id": activation.rule.id,
                     "rule_name": activation.rule.name,
-                    "conclusion": activation.conclusion_key,
+                    "activation_key": activation.activation_key,
+                    "conclusion_key": activation.conclusion_key,
                     "conclusion_label": activation.conclusion_label,
+                    "conclusion_value": activation.conclusion_value,
+                    "inserted_new_fact": activation.inserted_new_fact,
+                    "evaluations": [
+                        {
+                            "known": evaluation.known,
+                            "observed": evaluation.observed,
+                            "satisfied": evaluation.satisfied,
+                            "note": evaluation.note,
+                        }
+                        for evaluation in activation.evaluations
+                    ],
                 }
                 for activation in self.activations
             ],
             "actions": [
                 {
                     "action": action.action,
+                    "action_id": action.action_id,
                     "label": action.label,
-                    "target_type": action.target_type,
-                    "target_id": action.target_id,
-                    "status": action.status,
-                    "execution": None
-                    if action.execution is None
-                    else {
-                        "success": action.execution.success,
-                        "message": action.execution.message,
-                        "before": action.execution.before,
-                        "after": action.execution.after,
-                    },
+                    "phase": action.phase.value,
+                    "priority": action.priority,
+                    "finding_key": action.finding_key,
+                    "finding_label": action.finding_label,
+                    "finding_severity": action.finding_severity.value,
+                    "reason": action.reason,
+                    "approved": action.approved,
+                    "deferred": action.deferred,
+                    "defer_reason": action.defer_reason,
                 }
                 for action in self.actions
             ],
