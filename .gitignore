@@ -6,7 +6,12 @@ venv/
 env/
 .streamlit/secrets.toml
 data/investigations.json
+data/*.db
+data/*.db-wal
+data/*.db-shm
 *.zip
 *.pdf
+# Local reference only - not part of this project
+Car_Mechanic_Expert_System-main/
 .DS_Store
 Thumbs.db

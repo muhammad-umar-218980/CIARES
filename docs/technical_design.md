@@ -1,7 +1,7 @@
 # CIARES Technical Design
 
 This document explains how CIARES is implemented. It is the technical companion to
-`README.md` and the source for the code-explanation PDF and the viva.
+`README.md` and the source for report writing and the viva.
 
 ## 1. Design constraints
 
@@ -171,7 +171,7 @@ Consequences:
 
 Multiple rules may derive different findings from the same evidence. CIARES **keeps all of
 them**: `build_findings()` merges support for identical conclusions but never drops a
-finding because another one is more severe. The Security Overview therefore counts all
+finding because another one is more severe. The admin dashboard therefore counts all
 findings.
 
 ### Response conflicts
@@ -245,7 +245,7 @@ investigation are **not** auto-created: the inventory is fixed, so a response ai
 | Trace explanation | Ordered activation list plus the reasoning log (start, observations, activations, diagnosis, decision, finish) |
 | Justification explanation | Per activation: rule metadata, each condition with expected/observed/status, conclusion |
 | Action explanation | Why the action was selected, target-check outcome, execution status and `before -> after` state |
-| Markdown report | Full investigation export for the PDF/appendices |
+| Markdown report | Full investigation export for report appendices |
 
 The facility reads records; it never re-reasons.
 

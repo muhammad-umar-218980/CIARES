@@ -190,6 +190,16 @@ class DecisionEngine:
             action.action_id = f"ACT-{index:03d}"
         return proposed
 
+    def validate_target(self, action: ResponseAction, spec: ActionSpec) -> None:
+        """
+        Public, read-only target check.
+
+        The admin portal uses this to demonstrate the validation step without
+        running an investigation. Behaviour is identical to ``decide`` because
+        it delegates to the same routine.
+        """
+        self._validate_target(action, spec)
+
     # -- internals ----------------------------------------------------------
     @staticmethod
     def _resolve_target(

@@ -17,11 +17,11 @@ APP_DESCRIPTION = (
     "A rule-based Expert System that investigates security incidents, derives "
     "findings, recommends responses and executes them in a simulated environment."
 )
-APP_VERSION = "1.0.0"
+APP_VERSION = "2.0.0"
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DATA_DIR = PROJECT_ROOT / "data"
-HISTORY_PATH = DATA_DIR / "investigations.json"
+DB_PATH = DATA_DIR / "ciares.db"
 
 # --------------------------------------------------------------------------
 # CIARES threshold assumptions (not universal standards)
