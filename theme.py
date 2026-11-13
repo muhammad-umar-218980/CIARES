@@ -12,7 +12,7 @@ from typing import Any, Sequence
 
 import streamlit as st
 
-from config import APP_NAME, APP_TAGLINE, APP_VERSION
+from config import APP_NAME, APP_TAGLINE
 from engine.models import Severity
 
 SEVERITY_COLOUR: dict[Severity, str] = {
@@ -22,9 +22,26 @@ SEVERITY_COLOUR: dict[Severity, str] = {
     Severity.LOW: "#22c55e",
 }
 
+# Material Symbols (Rounded) names used by the sidebar and the cards.
+SECTION_ICONS: dict[str, str] = {
+    "Home": "home",
+    "Investigate": "travel_explore",
+    "Scenarios": "science",
+    "Results": "description",
+}
+
+MODULE_ICONS: dict[str, str] = {
+    "Authentication & Account Security": "key",
+    "Malware & Process Security": "bug_report",
+    "Network Security": "lan",
+    "Data Security & Protection": "database",
+    "Privilege & Security Policy": "admin_panel_settings",
+}
+
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
 
 html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stSidebar"],
 [data-testid="stMarkdownContainer"], [data-testid="stMetricValue"],
@@ -41,7 +58,13 @@ p, h1, h2, h3, h4, h5, h6, li, label, button, input, textarea, select {
 /* Streamlit's own page list is hidden: the sidebar radio is the only menu. */
 [data-testid="stSidebarNav"] {display: none !important;}
 
-.block-container {padding-top: 1.6rem; max-width: 1150px;}
+html {scroll-padding-top: 4.4rem;}
+
+/* The header floats over the content: keep it transparent and give the page
+   enough top padding that the first card is never clipped by it. */
+[data-testid="stHeader"] {background: transparent;}
+.block-container {padding-top: 4.2rem; max-width: 1150px;}
+
 .cihares-hero {
     background: linear-gradient(120deg, rgba(34,211,238,0.16), rgba(59,130,246,0.05));
     border: 1px solid rgba(34,211,238,0.25);
@@ -49,11 +72,22 @@ p, h1, h2, h3, h4, h5, h6, li, label, button, input, textarea, select {
     padding: 26px 30px;
     margin-bottom: 22px;
 }
-.cihares-kicker {font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: #22d3ee;}
-.cihares-hero h1 {margin: 6px 0 2px 0; font-size: 2.4rem; letter-spacing: 0.04em;}
+.cihares-hero h1 {margin: 0 0 2px 0; font-size: 2.4rem; letter-spacing: 0.04em;}
 .cihares-sub {font-size: 1rem; color: #e2e8f0;}
+.cihares-kicker {
+    font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase;
+    color: #22d3ee; margin-top: 10px;
+}
 .cihares-desc {font-size: 0.88rem; color: #94a3b8; margin-top: 8px; max-width: 900px;}
 
+.cihares-grid {
+    display: grid;
+    gap: 16px;
+    margin: 4px 0 22px 0;
+}
+@media (max-width: 820px) {
+    .cihares-grid {grid-template-columns: 1fr !important;}
+}
 .cihares-card {
     background: rgba(20,29,47,0.75);
     border: 1px solid rgba(148,163,184,0.16);
@@ -63,6 +97,15 @@ p, h1, h2, h3, h4, h5, h6, li, label, button, input, textarea, select {
 }
 .cihares-card h4 {margin: 0 0 6px 0; font-size: 0.95rem;}
 .cihares-card p {margin: 0; font-size: 0.82rem; color: #94a3b8;}
+.cihares-ic {
+    font-family: 'Material Symbols Rounded' !important;
+    font-size: 1.15rem;
+    line-height: 1;
+    color: #22d3ee;
+    margin-right: 7px;
+    vertical-align: -3px;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
 
 [data-testid="stMetric"] {
     background: rgba(20,29,47,0.85);
@@ -114,9 +157,9 @@ def hero(subtitle: str | None = None) -> None:
     st.markdown(
         f"""
         <div class="cihares-hero">
-            <div class="cihares-kicker">Rule-based Expert System · v{APP_VERSION}</div>
             <h1>{APP_NAME}</h1>
             <div class="cihares-sub">{subtitle or APP_TAGLINE}</div>
+            <div class="cihares-kicker">Rule-based Expert System</div>
             <div class="cihares-desc">
                 Describe what was observed, read the diagnosis in plain language,
                 approve the recommendations you agree with, and receive a written
@@ -134,8 +177,31 @@ def page_title(title: str, subtitle: str | None = None) -> None:
         st.caption(subtitle)
 
 
-def card(title: str, body: str) -> str:
-    return f'<div class="cihares-card"><h4>{title}</h4><p>{body}</p></div>'
+def card(title: str, body: str, icon: str | None = None) -> str:
+    badge = (
+        f'<span class="cihares-ic material-symbols-rounded">{icon}</span>'
+        if icon
+        else ""
+    )
+    return f'<div class="cihares-card"><h4>{badge}{title}</h4><p>{body}</p></div>'
+
+
+def card_grid(
+    items: Sequence[tuple[str, str, str]],
+    columns: int = 3,
+) -> str:
+    """Render ``(icon, title, body)`` triples as one evenly spaced CSS grid.
+
+    A single grid (rather than nested ``st.columns``) keeps the gap between
+    rows and stops cards from touching when the item count is not a multiple
+    of the column count.
+    """
+    cells = "".join(card(title, body, icon) for icon, title, body in items)
+    return (
+        f'<div class="cihares-grid" '
+        f'style="grid-template-columns:repeat({columns}, minmax(0, 1fr));">'
+        f"{cells}</div>"
+    )
 
 
 def metric_row(items: Sequence[tuple[str, Any, str]]) -> None:
@@ -173,7 +239,7 @@ def severity_chip(severity: Severity) -> str:
 
 def footer() -> None:
     st.markdown(
-        f'<div class="cihares-foot">{APP_NAME} v{APP_VERSION} · forward chaining · '
+        f'<div class="cihares-foot">{APP_NAME} · forward chaining · '
         f"decision support for a human analyst · Python + Streamlit</div>",
         unsafe_allow_html=True,
     )

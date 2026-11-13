@@ -40,8 +40,10 @@ from knowledge_base.rule_registry import ALL_RULES, MODULES
 from scenarios.sample_scenarios import SCENARIOS, get_scenario
 from storage import init_db, save_investigation
 from theme import (
+    MODULE_ICONS,
+    SECTION_ICONS,
     apply_theme,
-    card,
+    card_grid,
     footer,
     hero,
     metric_row,
@@ -177,9 +179,15 @@ def render_sidebar() -> None:
         st.session_state["section"] = pending
 
     with st.sidebar:
-        st.markdown(f"## {APP_NAME}")
+        st.markdown(f"#### :material/verified_user: {APP_NAME}")
         st.caption("Decision support for incident response")
-        st.radio("Section", SECTIONS, key="section", label_visibility="collapsed")
+        st.radio(
+            "Section",
+            SECTIONS,
+            key="section",
+            label_visibility="collapsed",
+            format_func=lambda section: f":material/{SECTION_ICONS[section]}: {section}",
+        )
         st.divider()
         investigation = current()
         if investigation is not None:
@@ -197,34 +205,46 @@ def home() -> None:
     report = validate_catalogue(ALL_RULES)
 
     st.markdown("### What it does")
-    columns = st.columns(3)
-    cards = [
-        (
-            "Diagnose",
-            "Compares what you observed against 60 explicit IF-THEN rules and names "
-            "the issue, with a severity and a plain-language reason.",
+    st.markdown(
+        card_grid(
+            [
+                (
+                    "health_and_safety",
+                    "Diagnose",
+                    "Compares what you observed against 60 explicit IF-THEN rules and "
+                    "names the issue, with a severity and a plain-language reason.",
+                ),
+                (
+                    "fact_check",
+                    "Explain",
+                    "Every conclusion lists the observations that supported it. Nothing "
+                    "is hidden behind a trained model.",
+                ),
+                (
+                    "task_alt",
+                    "Recommend, then wait",
+                    "Suggests containment, eradication, recovery and escalation steps. "
+                    "It does nothing until you approve them.",
+                ),
+            ]
         ),
-        (
-            "Explain",
-            "Every conclusion lists the observations that supported it. Nothing is "
-            "hidden behind a trained model.",
-        ),
-        (
-            "Recommend, then wait",
-            "Suggests containment, eradication, recovery and escalation steps. It "
-            "does nothing until you approve them.",
-        ),
-    ]
-    for column, (title, body) in zip(columns, cards):
-        column.markdown(card(title, body), unsafe_allow_html=True)
+        unsafe_allow_html=True,
+    )
 
     st.markdown("### Five knowledge modules")
-    module_columns = st.columns(3)
-    for index, module in enumerate(MODULES):
-        module_columns[index % 3].markdown(
-            card(module, MODULE_BLURBS.get(module, "Specialised security rules.")),
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        card_grid(
+            [
+                (
+                    MODULE_ICONS.get(module, "shield"),
+                    module,
+                    MODULE_BLURBS.get(module, "Specialised security rules."),
+                )
+                for module in MODULES
+            ]
+        ),
+        unsafe_allow_html=True,
+    )
 
     st.markdown("### What is inside")
     metric_row(
@@ -240,16 +260,31 @@ def home() -> None:
 
     st.markdown("### How to use it")
     steps = st.columns(4)
-    steps[0].markdown("**1 · Describe**\n\nEnter what was observed.")
-    steps[1].markdown("**2 · Read the diagnosis**\n\nSee the issue, severity and reasoning.")
-    steps[2].markdown("**3 · Review and approve**\n\nChoose the recommendations you accept.")
-    steps[3].markdown("**4 · Get the plan**\n\nReceive a written response plan.")
+    steps[0].markdown(":material/edit_note: **1 · Describe**\n\nEnter what was observed.")
+    steps[1].markdown(
+        ":material/fact_check: **2 · Read**\n\nSee the issue, severity and reasoning."
+    )
+    steps[2].markdown(
+        ":material/checklist: **3 · Approve**\n\nChoose the recommendations you accept."
+    )
+    steps[3].markdown(
+        ":material/description: **4 · Plan**\n\nReceive a written response plan."
+    )
 
     st.divider()
-    left, right, _ = st.columns([1, 1, 3])
-    if left.button("Start an investigation", type="primary", use_container_width=True):
+    left, right, _ = st.columns([1.5, 1, 2.5])
+    if left.button(
+        "Start an investigation",
+        type="primary",
+        use_container_width=True,
+        icon=":material/play_arrow:",
+    ):
         go("Investigate")
-    if right.button("Try a scenario", use_container_width=True):
+    if right.button(
+        "Try a scenario",
+        use_container_width=True,
+        icon=":material/science:",
+    ):
         go("Scenarios")
 
     st.info(

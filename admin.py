@@ -33,7 +33,7 @@ from storage import (
     recent_admin_events,
     stats,
 )
-from theme import metric_row, page_title
+from theme import MODULE_ICONS, metric_row, page_title
 
 MAX_ATTEMPTS = 5
 DEFAULT_EMAIL = "admin@ciares.local"
@@ -94,7 +94,7 @@ def sign_out() -> None:
 
 
 def _login_form() -> None:
-    st.markdown("### Administrator sign-in")
+    st.markdown("### :material/lock: Administrator sign-in")
     st.caption(
         "This area exposes the knowledge base, the inference engine and the "
         "decision engine. It is not part of the public investigation portal."
@@ -295,50 +295,65 @@ def _knowledge() -> None:
         "only when every condition is satisfied; Unknown never satisfies a condition."
     )
 
-    tabs = st.tabs([f"{module} ({len(RULES_BY_MODULE[module])})" for module in MODULES])
-    for tab, module in zip(tabs, MODULES):
-        rules = RULES_BY_MODULE[module]
-        with tab:
+    chosen = st.pills(
+        "Knowledge module",
+        MODULES,
+        selection_mode="single",
+        default=MODULES[0],
+        key="kb_module",
+        format_func=lambda module: (
+            f":material/{MODULE_ICONS.get(module, 'shield')}: "
+            f"{module} ({len(RULES_BY_MODULE[module])})"
+        ),
+    )
+    module = chosen or MODULES[0]
+    rules = RULES_BY_MODULE[module]
+
+    st.markdown(f"#### {module}")
+    st.caption(
+        f"{len(rules)} rules · "
+        f"{sum(rule.condition_count for rule in rules)} conditions"
+    )
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "Rule": rule.id,
+                    "Name": rule.name,
+                    "Conditions": rule.condition_count,
+                    "Conclusion": rule.conclusion_label,
+                    "Severity": rule.severity.value,
+                    "Source": rule.source,
+                }
+                for rule in rules
+            ]
+        ),
+        hide_index=True,
+    )
+    for rule in rules:
+        with st.expander(f"{rule.id} · {rule.name}"):
+            st.write(rule.description)
             st.dataframe(
                 pd.DataFrame(
                     [
                         {
-                            "Rule": rule.id,
-                            "Name": rule.name,
-                            "Conditions": rule.condition_count,
-                            "Conclusion": rule.conclusion_label,
-                            "Severity": rule.severity.value,
-                            "Response": rule.recommended_action or "—",
-                            "Source": rule.source,
+                            "Condition": condition.describe(),
+                            "Field": condition.field,
+                            "Operator": condition.operator,
+                            "Value": str(condition.value),
                         }
-                        for rule in rules
+                        for condition in rule.conditions
                     ]
                 ),
                 hide_index=True,
             )
-            for rule in rules:
-                with st.expander(f"{rule.id} · {rule.name}"):
-                    st.write(rule.description)
-                    st.dataframe(
-                        pd.DataFrame(
-                            [
-                                {
-                                    "Condition": condition.describe(),
-                                    "Field": condition.field,
-                                    "Operator": condition.operator,
-                                    "Value": str(condition.value),
-                                }
-                                for condition in rule.conditions
-                            ]
-                        ),
-                        hide_index=True,
-                    )
-                    st.markdown(
-                        f"**IF** {rule.describe_conditions()}  \n"
-                        f"**THEN** `{rule.conclusion_key}` = True "
-                        f"({rule.conclusion_label})  \n"
-                        f"**Severity** {rule.severity.value} · **Source** {rule.source}"
-                    )
+            st.markdown(
+                f"**IF** {rule.describe_conditions()}  \n"
+                f"**THEN** `{rule.conclusion_key}` = True "
+                f"({rule.conclusion_label})  \n"
+                f"**Response** {rule.recommended_action or '—'} · "
+                f"**Severity** {rule.severity.value} · **Source** {rule.source}"
+            )
 
     st.divider()
     st.markdown("#### Condition inventory")
