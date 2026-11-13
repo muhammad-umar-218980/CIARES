@@ -47,6 +47,15 @@ TABS = (
     "System map",
 )
 
+TAB_ICONS = {
+    "Dashboard": "📊",
+    "Knowledge base": "📚",
+    "Inference engine": "⚙️",
+    "Decision engine": "🧭",
+    "Audit": "🧾",
+    "System map": "🗺️",
+}
+
 
 # ---------------------------------------------------------------------------
 # Authentication gate (single administrator, session level)
@@ -426,7 +435,7 @@ def _inference() -> None:
     )
 
     tabs = st.tabs(
-        ["Activation sequence", "Justification", "Working memory", "Reasoning log"]
+        ["Activation sequence", "Justification", "Working memory"]
     )
 
     with tabs[0]:
@@ -456,17 +465,6 @@ def _inference() -> None:
 
     with tabs[2]:
         _working_memory(record)
-
-    with tabs[3]:
-        st.dataframe(
-            pd.DataFrame(engine.trace_rows(investigation)),
-            hide_index=True,
-            column_config={
-                "Step": st.column_config.NumberColumn(width="small"),
-                "Event": st.column_config.TextColumn(width="small"),
-                "Detail": st.column_config.TextColumn(width="large"),
-            },
-        )
 
     st.divider()
     st.download_button(
@@ -689,8 +687,16 @@ def render() -> None:
     _account_bar()
     st.divider()
 
-    tabs = st.tabs(list(TABS))
+    chosen = st.pills(
+        "Section",
+        TABS,
+        selection_mode="single",
+        default=TABS[0],
+        key="admin_section",
+        format_func=lambda tab: f"{TAB_ICONS[tab]} {tab}",
+        label_visibility="collapsed",
+    )
+    st.divider()
+
     renderers = (_dashboard, _knowledge, _inference, _decision, _audit, _system_map)
-    for tab, renderer in zip(tabs, renderers):
-        with tab:
-            renderer()
+    renderers[TABS.index(chosen or TABS[0])]()

@@ -44,8 +44,8 @@ no second reasoning path.
 | File | Responsibility |
 |---|---|
 | `app.py` | Public portal at `/`: sidebar sections, observation form, prose results, approval, plan download |
-| `admin.py` | Administration at `/admin`: sign-in gate then six tabs |
-| `theme.py` | Poppins, hero, cards, metric row, threat meter, severity chips, footer |
+| `admin.py` | Administration at `/admin`: sign-in gate then six sections |
+| `theme.py` | Poppins, emoji icons, hero, cards, metric row, threat meter, severity chips, footer |
 | `passwords.py` | PBKDF2 hashing and constant-time credential checks |
 | `config.py` | App metadata, thresholds, approved sources, paths |
 | `storage/db.py` | SQLite schema, save/load, aggregates, admin event log |
@@ -58,7 +58,7 @@ no second reasoning path.
 | `engine/pipeline.py` | End-to-end orchestration; builds findings |
 | `engine/decision_engine.py` | Action catalogue, deduplication, deferral, ordering |
 | `engine/report.py` | Threat score, prose diagnosis, approval and response plan |
-| `engine/explanation_engine.py` | Trace and justification tables for the admin portal |
+| `engine/explanation_engine.py` | Justification tables and trace helpers for the admin portal |
 | `scenarios/` | Six predefined investigation inputs |
 | `tests/` | 106 tests covering rules, inference, decisions, scenarios, storage and auth |
 
@@ -74,7 +74,7 @@ no second reasoning path.
 | `engine/pipeline.py` | Each surface would have to wire the engines itself; the portal, scenarios and tests would diverge. |
 | `engine/decision_engine.py` | Findings still appear, but no recommendation is produced; Results says the findings are diagnostic. |
 | `engine/report.py` | The public portal has no prose, score, approval or plan; only raw records remain. |
-| `engine/explanation_engine.py` | Administration still works, but the trace and justification tabs are empty. |
+| `engine/explanation_engine.py` | Administration still works, but the justification tab is empty. |
 | `knowledge_base/knowledge_acquisition.py` | The validation banner disappears and invalid rules could be registered silently. |
 | `storage/db.py` | The audit tab and dashboard are empty; public investigations still work. |
 | `theme.py` | The app runs, but loses Poppins, the hero, the cards and the threat meter. |
