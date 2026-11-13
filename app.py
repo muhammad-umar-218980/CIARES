@@ -179,14 +179,14 @@ def render_sidebar() -> None:
         st.session_state["section"] = pending
 
     with st.sidebar:
-        st.markdown(f"#### :material/verified_user: {APP_NAME}")
+        st.markdown(f"#### 🛡️ {APP_NAME}")
         st.caption("Decision support for incident response")
         st.radio(
             "Section",
             SECTIONS,
             key="section",
             label_visibility="collapsed",
-            format_func=lambda section: f":material/{SECTION_ICONS[section]}: {section}",
+            format_func=lambda section: f"{SECTION_ICONS[section]} {section}",
         )
         st.divider()
         investigation = current()
@@ -209,19 +209,19 @@ def home() -> None:
         card_grid(
             [
                 (
-                    "health_and_safety",
+                    "🩺",
                     "Diagnose",
                     "Compares what you observed against 60 explicit IF-THEN rules and "
                     "names the issue, with a severity and a plain-language reason.",
                 ),
                 (
-                    "fact_check",
+                    "🧠",
                     "Explain",
                     "Every conclusion lists the observations that supported it. Nothing "
                     "is hidden behind a trained model.",
                 ),
                 (
-                    "task_alt",
+                    "✅",
                     "Recommend, then wait",
                     "Suggests containment, eradication, recovery and escalation steps. "
                     "It does nothing until you approve them.",
@@ -260,15 +260,15 @@ def home() -> None:
 
     st.markdown("### How to use it")
     steps = st.columns(4)
-    steps[0].markdown(":material/edit_note: **1 · Describe**\n\nEnter what was observed.")
+    steps[0].markdown("✍️ **1 · Describe**\n\nEnter what was observed.")
     steps[1].markdown(
-        ":material/fact_check: **2 · Read**\n\nSee the issue, severity and reasoning."
+        "📖 **2 · Read**\n\nSee the issue, severity and reasoning."
     )
     steps[2].markdown(
-        ":material/checklist: **3 · Approve**\n\nChoose the recommendations you accept."
+        "☑️ **3 · Approve**\n\nChoose the recommendations you accept."
     )
     steps[3].markdown(
-        ":material/description: **4 · Plan**\n\nReceive a written response plan."
+        "📝 **4 · Plan**\n\nReceive a written response plan."
     )
 
     st.divider()

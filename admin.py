@@ -302,7 +302,7 @@ def _knowledge() -> None:
         default=MODULES[0],
         key="kb_module",
         format_func=lambda module: (
-            f":material/{MODULE_ICONS.get(module, 'shield')}: "
+            f"{MODULE_ICONS.get(module, '🛡️')} "
             f"{module} ({len(RULES_BY_MODULE[module])})"
         ),
     )

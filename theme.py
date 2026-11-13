@@ -22,20 +22,20 @@ SEVERITY_COLOUR: dict[Severity, str] = {
     Severity.LOW: "#22c55e",
 }
 
-# Material Symbols (Rounded) names used by the sidebar and the cards.
+# Emoji icons for the sidebar and the cards.
 SECTION_ICONS: dict[str, str] = {
-    "Home": "home",
-    "Investigate": "travel_explore",
-    "Scenarios": "science",
-    "Results": "description",
+    "Home": "🏠",
+    "Investigate": "🔍",
+    "Scenarios": "🧪",
+    "Results": "📄",
 }
 
 MODULE_ICONS: dict[str, str] = {
-    "Authentication & Account Security": "key",
-    "Malware & Process Security": "bug_report",
-    "Network Security": "lan",
-    "Data Security & Protection": "database",
-    "Privilege & Security Policy": "admin_panel_settings",
+    "Authentication & Account Security": "🔑",
+    "Malware & Process Security": "🦠",
+    "Network Security": "🌐",
+    "Data Security & Protection": "🗄️",
+    "Privilege & Security Policy": "🛡️",
 }
 
 CSS = """
@@ -49,6 +49,10 @@ html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stSidebar"
 p, h1, h2, h3, h4, h5, h6, li, label, button, input, textarea, select {
     font-family: 'Poppins', 'Segoe UI', sans-serif !important;
 }
+
+/* Sidebar menu labels are emojis: keep them readable, not microscopic. */
+[data-testid="stSidebar"] [role="radiogroup"] label p {font-size: 1.1rem;}
+[data-testid="stSidebar"] [role="radiogroup"] label {line-height: 1.9;}
 
 /* Never restyle the icon font, or arrows turn into words. */
 [data-testid="stIconMaterial"], .material-symbols-rounded, .material-icons {
@@ -98,12 +102,10 @@ html {scroll-padding-top: 4.4rem;}
 .cihares-card h4 {margin: 0 0 6px 0; font-size: 0.95rem;}
 .cihares-card p {margin: 0; font-size: 0.82rem; color: #94a3b8;}
 .cihares-ic {
-    font-family: 'Material Symbols Rounded' !important;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     line-height: 1;
-    color: #22d3ee;
     margin-right: 7px;
-    vertical-align: -3px;
+    vertical-align: -2px;
     font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
@@ -179,7 +181,7 @@ def page_title(title: str, subtitle: str | None = None) -> None:
 
 def card(title: str, body: str, icon: str | None = None) -> str:
     badge = (
-        f'<span class="cihares-ic material-symbols-rounded">{icon}</span>'
+        f'<span class="cihares-ic">{icon}</span>'
         if icon
         else ""
     )
