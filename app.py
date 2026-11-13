@@ -581,6 +581,10 @@ def main() -> None:
         initial_sidebar_state="expanded",
     )
     apply_theme()
+    # Every route touches SQLite, and on a fresh deploy the database file does
+    # not exist yet. Create the schema before navigation so /admin cannot hit
+    # "no such table" on first load.
+    init_db()
 
     import admin
 
