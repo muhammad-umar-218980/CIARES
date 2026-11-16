@@ -1,0 +1,497 @@
+CIARES EXPERT SYSTEM VIVA GUIDE
+================================
+
+==========================================================================
+1. WHAT CIARES IS - An Expert System for Cybersecurity Incident Analysis
+==========================================================================
+
+CIARES (Cybersecurity Incident Analysis and Response Expert System) is a
+rule-based forward-chaining expert system that:
+
+- Diagnoses cybersecurity incidents from observed data
+- Explains the reasoning behind diagnoses
+- Recommends containment/eradication/recovery actions
+- Writes a human-approved response plan
+
+It is NOT a machine-learning model. All reasoning is derived from 60 manually
+authored IF-THEN rules based on cybersecurity best practices (MITRE ATT&CK,
+NIST SP 800-61, CISA Guidance).
+
+==========================================================================
+2. EXPERT SYSTEM COMPONENTS & THEIR LOCATIONS
+==========================================================================
+
+2.1 DECISION MAKING
+------------------
+WHERE: engine/decision_engine.py
+
+The Decision Engine answers "what should we do about it?" It:
+- Takes findings from the Inference Engine
+- Maps each finding to a response action (isolate endpoint, disable account, etc.)
+- Orders recommendations by response phase (Containment → Eradication → Recovery → Escalation)
+- Defers Recovery actions until Containment is verified
+- Collapses identical actions into single recommendations
+
+Decision Rules (shown in admin UI under "Decision engine" tab):
+1. A response is recommended only when the rule behind a finding asks for it.
+2. Identical actions are collapsed into one recommendation.
+3. Recovery is deferred while a containment action is still open.
+4. Recommendations are ordered by response phase, then by declared priority.
+5. The analyst approves the list; CIARES itself executes nothing.
+
+2.2 DECISION SUPPORT SYSTEM (DSS)
+---------------------------------
+WHERE: engine/pipeline.py (run_investigation function), engine/decision_engine.py
+
+The pipeline is the single entry point that connects observations → working
+memory → forward chaining → diagnosis → decision engine → Investigation.
+
+It runs the exact same reasoning for:
+- Manual investigations (user enters observations)
+- Predefined scenarios
+- pytest test cases
+
+The DSS provides the structured investigation process through the Streamlit UI:
+Home → Investigate → (enter observations) → Results
+
+2.3 INFERENCE ENGINE
+--------------------
+WHERE: engine/inference_engine.py
+
+The Forward-Chaining Inference Engine is the core reasoning component. It:
+- Evaluates every rule against working memory (the observed facts)
+- A rule is ELIGIBLE only when every one of its conditions is satisfied
+- Unknown facts make a rule ineligible (never assume Unknown = False)
+- Fires one rule at a time, re-evaluating after each firing
+- Records the complete activation order (for explanation)
+- Stops when no eligible rules remain (fixed point)
+
+Algorithm (one cycle = one rule firing):
+1. Evaluate every rule against working memory
+2. A rule is eligible only when every condition is satisfied
+3. Build activation key from rule id + supporting facts, discard duplicates
+4. Fire the highest-priority eligible rule, record the activation
+5. Repeat from step 1 until no eligible activation remains
+
+Key properties:
+- Three-valued logic: True, False, Unknown (Unknown ≠ False)
+- Deterministic conflict resolution: strongest severity first, then priority, then rule ID
+- Maximum cycle limit prevents infinite loops
+- Trace is recorded for every step
+
+2.4 DIAGNOSIS
+--------------
+WHERE: engine/inference_engine.py → engine/pipeline.py → engine/models.py → app.py (Results page)
+
+Diagnosis is produced through rule firings:
+- Each fired rule produces a conclusion (e.g., "possible_account_compromise")
+- Conclusions are grouped into Findings with severity, module, and supporting rule IDs
+- Multiple rules can support the same finding; strongest severity wins
+- Findings have recommended_actions that the Decision Engine uses
+
+Diagnosis flow:
+1. User enters observations (via app.py Investigate form)
+2. Observations stored in WorkingMemory
+3. Inference Engine runs forward chaining
+4. Activated rules produce conclusions → Findings
+5. Decision Engine maps findings to recommendations
+6. Results page displays diagnosis in plain language
+
+==========================================================================
+3. THE 60 RULES - LOCATION AND STRUCTURE
+==========================================================================
+
+All 60 rules are in engine/knowledge_base/ module files:
+
+Module 1 - Authentication & Account Security (AUTH-01 to AUTH-12) - engine/knowledge_base/authentication.py
+  - 12 rules covering: repeated failures, suspicious logins, unusual locations,
+    account compromise, disabled account access, off-hours admin logins, excessive
+    sessions, password changes, MFA brute force, impossible travel, confirmed
+    compromise, suspicious active sessions
+
+Module 2 - Malware & Process Security (MAL-01 to MAL-12) - engine/knowledge_base/malware.py
+  - 12 rules covering: unusual executable locations, unapproved processes,
+    policy-violating processes, suspicious process activity, unauthorized file
+    modification, untrusted executables, process spawning, persistence mechanisms,
+    unknown binaries in temp dir, malware activity suspected, log tampering, active
+    intrusion with concealment
+
+Module 3 - Network Security (NET-01 to NET-12) - engine/knowledge_base/network.py
+  - 12 rules covering: unauthorized destinations, unusual outbound traffic,
+    unapproved ports, suspicious connections, unauthorized remote access, exposed
+    services, inbound connections, denied requests, C2 beaconing, exfiltration
+    patterns, remote intrusion, active network compromise
+
+Module 4 - Data Security & Protection (DATA-01 to DATA-12) - engine/knowledge_base/data_security.py
+  - 12 rules covering: unusual data transfers, unauthorized destinations,
+    sensitive data access, potential exfiltration, unauthorized deletion, unapproved
+    modification, sensitive data sharing, after-hours access, bulk downloads,
+    bulk export to unapproved destinations, confirmed exfiltration, data integrity
+    breach
+
+Module 5 - Privilege & Security Policy (POL-01 to POL-12) - engine/knowledge_base/security_policy.py
+  - 12 rules covering: privilege escalation, unauthorized privilege assignment,
+    security control changes, suspicious privileged activity, policy violations,
+    unauthorized admin operations, config changes, separation-of-duties violations,
+    dormant privileged accounts, active control tampering, insider threat suspected,
+    coordinated privilege compromise
+
+Total: 5 modules × 12 rules = 60 rules
+
+Each rule is a Rule dataclass with: id, name, module, description, conditions
+(tuple of Condition objects), conclusion_key, conclusion_label, severity,
+source, and optionally recommended_action and action_phase.
+
+==========================================================================
+4. CYPERSECURITY CONCEPTS EXPLAINED
+==========================================================================
+
+The expert system covers these cybersecurity areas:
+
+AUTHENTICATION & ACCOUNT SECURITY:
+- Brute-force password guessing detection
+- Credential spraying detection
+- Unusual login location detection
+- Impossible travel (geographic anomaly)
+- MFA brute-force detection
+- Disabled account access attempts
+
+MALWARE & PROCESS SECURITY:
+- Unapproved executable execution
+- Policy-violating process behavior
+- Persistence mechanism detection (registry/run keys, services)
+- Log tampering/anti-forensics
+- Shell spawning by unapproved processes
+- Unknown unsigned executables in temp directories
+
+NETWORK SECURITY:
+- Unauthorized destination access (policy violation)
+- Command-and-Control beaconing detection
+- Network exfiltration patterns
+- Unauthorized remote access (RDP, VPN, etc.)
+- Port policy violations
+- Scanning and denied request patterns
+
+DATA SECURITY & PROTECTION:
+- Unusual data transfer volumes
+- Unauthorized transfer destinations
+- Sensitive file access without authorization
+- Data exfiltration detection
+- Bulk data download detection
+- After-hours sensitive data access
+- External sensitive data sharing
+
+PRIVILEGE & SECURITY POLICY:
+- Privilege escalation detection
+- Unauthorized privilege assignments
+- Security control disabling/ tampering
+- Separation-of-duties violations
+- Dormant privileged account risks
+- Insider threat indicators
+- Coordinated multi-vector attacks
+
+Thresholds (project assumptions, not universal standards) are in config.py:
+- failed_login_attempts: 10
+- concurrent_sessions: 3
+- mfa_failures: 5
+- outbound_traffic_mb: 500
+- transfer_volume_mb: 1000
+- download_count: 100
+- connection_attempts: 20
+- denied_requests: 15
+
+Working hours assumption: 08:00 - 18:00 (after-hours = outside this window)
+
+==========================================================================
+5. USER ROLES AND HOW TO USE CIARES
+==========================================================================
+
+5.1 USER ROLES
+
+- INVESTIGATOR (public portal user): Observes security incidents, enters
+  observations, reads diagnosis and recommendations, approves response actions.
+  No cybersecurity expertise required - the system guides them through the process.
+
+- ADMINISTRATOR: Accesses the hidden /admin portal (password-protected). Can:
+  - View all stored investigations
+  - Inspect knowledge base structure and all 60 rules
+  - View inference trace and justifications
+  - View decision recommendations and action catalogue
+  - Audit investigation history
+  - Clear all records (danger zone)
+
+5.2 HOW TO USE CIARES - Step-by-Step (from the Home page)
+
+STEP 1 · DESCRIBE: Enter what was observed
+- Navigate to "Investigate" section
+- Fill in the observation fields under 5 modules:
+  * Authentication & Account Security (TRI/number fields)
+  * Malware & Process Security (TRI/number fields)
+  * Network Security (TRI/number fields)
+  * Data Security & Protection (TRI/number fields)
+  * Privilege & Security Policy (TRI fields)
+- Or click "Try a scenario" to use predefined investigations
+
+STEP 2 · READ: See the issue, severity and reasoning
+- Click "Run investigation"
+- The system performs forward-chaining inference
+- Results page shows: headline, overview paragraph, findings with severity
+- Technical evidence can be expanded (rule IDs shown for audit)
+
+STEP 3 · APPROVE: Choose the recommendations you accept
+- Review recommended responses (phase-ordered: Containment first)
+- Tick the actions you accept
+- Click "Approve selected recommendations"
+- Approved actions can be downloaded as a response plan
+
+STEP 4 · PLAN: Receive a written response plan
+- After approval, a structured plan is generated
+- Contains steps organized by response phase
+- Can be downloaded as .txt file
+- System advises a human; it does not disable accounts or change real systems
+
+==========================================================================
+6. UI LOCATIONS WITHIN THE APPLICATION
+==========================================================================
+
+Main Application (app.py) - Public Portal:
+
+- HOME (sidebar "Home"): Overview with 3 cards (Diagnose, Explain, Recommend)
+  - Shows rule count, condition count, distinct facts, modules, scenarios
+  - "How to use it" steps (1-4)
+  - Buttons: "Start an investigation", "Try a scenario"
+
+- INVESTIGATE (sidebar "Investigate"): Observation entry form
+  - Expandable sections for 5 modules
+  - TRI options: Unknown, True, False
+  - "Run investigation" button
+  - Shows last manual investigation
+
+- SCENARIOS (sidebar "Scenarios"): Six predefined investigations
+  - SCN-001: Account Compromise Investigation
+  - SCN-002: Malware Activity Investigation
+  - SCN-003: Network Intrusion Investigation
+  - SCN-004: Data Exfiltration Investigation
+  - SCN-005: Privilege Escalation Investigation
+  - SCN-006: Credential Abuse and Data Integrity Investigation
+  - Each supplies observations only; diagnosis comes from the engine
+
+- RESULTS (sidebar "Results"): Investigation diagnosis and recommendations
+  - Threat meter (score + severity)
+  - Headline finding
+  - Overview paragraph
+  - Findings with severity chips
+  - Reasoning/why this happened (plain language paragraphs)
+  - Recommended response (checkboxes for approval)
+  - Technical evidence expander (rule IDs for audit)
+  - Download response plan button
+
+Admin Portal (/admin, password-protected):
+
+- DASHBOARD: Aggregated statistics, findings by severity/module, knowledge
+  base validation status, recent admin activity
+
+- KNOWLEDGE BASE: Browse all 60 rules, view conditions, conclusions, severities,
+  sources. Search by module. View rule ID expansions.
+
+- INFERENCE ENGINE: View activation sequences, justifications, working memory
+  provenance for stored investigations.
+
+- DECISION ENGINE: Decision rules display, recommendations, action catalogue
+  (all 15 possible responses with phases, priorities, descriptions).
+
+- AUDIT: Search and filter investigations, inspect findings/observations/activations
+ /recommendations, download records as JSON or CSV.
+
+- SYSTEM MAP: Documentation of codebase structure and function responsibilities.
+
+==========================================================================
+7. WHY CIARES IS AN EXPERT SYSTEM
+==========================================================================
+
+CIARES qualifies as an expert system because it:
+
+1. HAS A KNOWLEDGE BASE: 60 manually authored IF-THEN rules encoding cybersecurity
+   expertise from MITRE ATT&CK, NIST, CISA sources. The knowledge is explicit and
+   auditable (in knowledge_base/ module files).
+
+2. HAS AN INFERENCE ENGINE: Forward-chaining reasoner (engine/inference_engine.py)
+   that derives conclusions from observations using modus ponens (if conditions
+   satisfied, conclude the conclusion). Uses three-valued logic (True/False/Unknown).
+
+3. PROVIDES DECISION SUPPORT: The Decision Engine (engine/decision_engine.py)
+   translates diagnoses into ordered, phase-structured recommendations that an
+   analyst approves before execution.
+
+4. GIVES DIAGNOSES: Produces a set of findings with severities, root causes,
+   supporting rules, and recommended actions.
+
+5. EXPLAINS REASONING: Trace explanation (ordered rule activations) and justification
+   explanation (per-condition satisfaction details) are available through the
+   Explanation Engine (engine/explanation_engine.py).
+
+6. IS DECISION-BOUNDARY: CIARES never executes actions itself. All recommendations
+   require human analyst approval. This is a critical design choice stated in the
+   system: "CIARES advises a human. It does not disable accounts, isolate hosts or
+   change any real system."
+
+==========================================================================
+8. VIVA QUESTIONS YOUR SIR MIGHT ASK
+==========================================================================
+
+Q1: "How does CIARES reach a diagnosis from observations?"
+   A: User enters observations → stored in WorkingMemory → Inference Engine runs
+   forward chaining, evaluating 60 IF-THEN rules one cycle at a time → eligible
+   rules fire (highest priority first) → conclusions inserted into working memory
+   → after fixed point, findings are built from activated rules → diagnosis produced
+
+Q2: "Where are the 60 rules and how are they organized?"
+   A: 60 rules in engine/knowledge_base/ across 5 modules:
+   - AUTH-01 to AUTH-12 (Authentication, 12 rules)
+   - MAL-01 to MAL-12 (Malware & Process, 12 rules)
+   - NET-01 to NET-12 (Network Security, 12 rules)
+   - DATA-01 to DATA-12 (Data Security, 12 rules)
+   - POL-01 to POL-12 (Privilege & Policy, 12 rules)
+   All assembled in rule_registry.py as ALL_RULES.
+
+Q3: "How does the inference engine handle Unknown facts?"
+   A: Unknown is deliberately different from False. A rule with an Unknown
+   condition is INELIGIBLE (never fires). This means rules only fire on provided
+   observations; missing facts simply don't trigger rules rather than being
+   treated as False.
+
+Q4: "What are the decision rules in CIARES?"
+   A: 5 decision rules (shown in admin portal under Decision engine tab):
+   1. Response recommended only when rule asks for it
+   2. Identical actions collapsed into one
+   3. Recovery deferred while containment open
+   4. Recommendations ordered by phase then priority
+   5. Analyst approves; CIARES executes nothing
+
+Q5: "Can you walk through a complete investigation?"
+   A: Yes - see Section 5.2 above. Steps: Describe → Read → Approve → Plan.
+
+Q6: "What's the difference between True and Unknown?"
+   A: True = observed and confirmed. Unknown = fact not provided (key absent).
+   A rule needing True won't fire if the fact is Unknown. This is not the same
+   as assuming False; it means the rule is simply ineligible until the fact is
+   provided.
+
+Q7: "How does CIARES ensure it doesn't act on real systems?"
+   A: By design. The system only produces diagnoses and recommendations. An
+   approved response is never executed automatically. The analyst must manually
+   carry out any actions. This is stated in the UI and in the code (no real
+   system interaction beyond observation input).
+
+Q8: "What thresholds does CIARES use and are they standards?"
+   A: Thresholds are in config.py and are project assumptions, not universal
+   standards. They make the knowledge base deterministic and testable. Examples:
+   failed_login_attempts >= 10, concurrent_sessions >= 3, outbound_traffic_mb >= 500.
+
+Q9: "What cybersecurity frameworks does CIARES reference?"
+   A: Rules cite MITRE ATT&CK techniques, NIST SP 800-61 Rev. 3, NIST Cybersecurity
+   Framework 2.0, and CISA Guidance. Each rule has a "source" field.
+
+Q10: "How would you extend CIARES with new rules?"
+    A: Add rule tuples to the appropriate module file in knowledge_base/ (e.g.,
+    authentication.py for auth rules). Then regenerate ALL_RULES via
+    rule_registry.py. The inference engine and pipeline require no changes.
+
+==========================================================================
+9. ADDITIONAL TECHNICAL DETAILS FOR VIVA
+==========================================================================
+
+9.1 FILE STRUCTURE SUMMARY
+
+D:/CIARES/ (project root)
+│
+├── app.py              # Public portal entry point (Streamlit routes)
+├── admin.py            # Admin portal (password-protected, 6 tabs)
+├── config.py           # Thresholds, app name, approved sources
+├── knowledge_base/     # Rule modules (5 modules × 12 rules = 60 rules)
+│   ├── authentication.py
+│   ├── malware.py
+│   ├── network.py
+│   ├── data_security.py
+│   └── security_policy.py
+│
+├── engine/           # Core expert system engine
+│   ├── __init__.py
+│   ├── models.py       # Data structures (Rule, Condition, Finding, etc.)
+│   ├── inference_engine.py  # Forward-chaining engine
+│   ├── decision_engine.py   # Decision/response recommendations
+│   ├── explanation_engine.py # Trace/justification explanations
+│   ├── pipeline.py       # End-to-end investigation orchestration
+│   ├── working_memory.py # Per-investigation facts
+│   └── report.py         # Report generation (not read separately but used)
+│
+├── storage/          # SQLite persistence (db.py)
+│   └── __init__.py
+│
+├── scenarios/        # 6 predefined investigation scenarios
+│   └── sample_scenarios.py
+│
+├── .streamlit/       # Streamlit configuration
+│   └── config.toml
+│
+├── tools/            # Utility tools
+│   └── hash_password.py
+│
+├── data/             # SQLite database (ciares.db) + seed backup
+│
+├── tests/            # pytest test suite (8 test files)
+│   ├── test_rules.py
+│   ├── test_inference.py
+│   ├── test_decisions.py
+│   ├── test_scenarios.py
+│   ├── test_auth.py
+│   ├── test_coverage.py
+│   ├── test_storage.py
+│   └── conftest.py
+│
+├── requirements.txt  # Project dependencies
+├── README.md         # Project description
+├── Expert_System_Theory.md  # Theory reference
+└── CIARES_Cover_Page.docx   # Project cover document
+
+9.2 KEY DATAFLOW (observation → diagnosis → recommendation)
+
+[User enters observations] → app.py _collect() → pipeline.run_investigation()
+│
+├── WorkingMemory.add_observations()  ← stores observed facts
+│
+├── InferenceEngine.run()           ← forward chaining
+│   ├── evaluates ALL_RULES against WM
+│   ├── fires eligible rules one cycle at a time
+│   └── records activation trace
+│
+├── build_findings()                ← groups activations into Findings
+│   └── each finding has: severity, module, rule_ids, recommended_action
+│
+├── DecisionEngine.decide()         ← maps findings to recommendations
+│   └── produces ordered ResponseAction list
+│
+└── Investigation object returned → app.py Results page displays
+
+9.3 INVESTIGATION METRICS
+
+Per investigation, the system tracks:
+- Activation count (how many rule firings)
+- Finding count (diagnosed issues)
+- Severity counts (Critical/High/Medium/Low)
+- Action count (recommendations produced)
+- Approved count (actions analyst approved)
+- Threat score (numeric, from engine.report)
+- Terminated reason (fixed point or cycle limit)
+- Scenario ID (manual or SCN-001 through SCN-006)
+
+9.4 CYCLE LIMIT
+
+Inference stops when:
+- No eligible rules remain (fixed point → completed)
+- Max cycles reached (100 + 5 × number of rules = ~400 cycles)
+- Terminated reason recorded in investigation record
+
+==========================================================================
+END OF VIVA GUIDE
+==========================================================================
