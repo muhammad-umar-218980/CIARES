@@ -135,6 +135,22 @@ def _observed_phrase(evaluation: Any) -> str:
     return f"{text} (observed {value})"
 
 
+# A handful of conclusion labels are plural noun phrases, so the sentence that
+# introduces their evidence needs "are supported by" instead of "is supported
+# by". The list is explicit rather than guessed from the spelling of the label.
+PLURAL_CONCLUSIONS: frozenset[str] = frozenset(
+    {
+        "Repeated authentication failures",
+        "Excessive concurrent sessions",
+        "Repeated denied requests",
+    }
+)
+
+
+def _support_verb(conclusion: str) -> str:
+    return "are" if conclusion in PLURAL_CONCLUSIONS else "is"
+
+
 def reasoning_paragraphs(investigation: Investigation) -> list[str]:
     """
     Explain each conclusion using the conditions that were satisfied.
@@ -159,7 +175,8 @@ def reasoning_paragraphs(investigation: Investigation) -> list[str]:
         else:
             evidence = ", ".join(phrases[:-1]) + " and " + phrases[-1]
         paragraphs.append(
-            f"{conclusion} is supported by the following observations: {evidence}."
+            f"{conclusion} {_support_verb(conclusion)} supported by the following "
+            f"observations: {evidence}."
         )
 
     if not paragraphs:

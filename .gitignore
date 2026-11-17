@@ -14,3 +14,4 @@ data/*.db-shm
 Car_Mechanic_Expert_System-main/
 .DS_Store
 Thumbs.db
+report/

@@ -12,6 +12,7 @@ import pytest
 
 from engine.pipeline import run_investigation
 from engine.report import (
+    PLURAL_CONCLUSIONS,
     approve,
     evidence_rows,
     plan_steps,
@@ -119,6 +120,18 @@ def test_public_narrative_hides_rule_identifiers(scenario_id):
 
     score = threat_score(investigation)
     assert 0 <= score <= 100
+
+
+@pytest.mark.parametrize("scenario_id", SCENARIO_IDS)
+def test_reasoning_paragraphs_agree_with_their_subject(scenario_id):
+    """A plural conclusion takes "are supported by"; a singular one takes "is"."""
+    investigation = run(scenario_id)
+    for paragraph in reasoning_paragraphs(investigation):
+        conclusion = paragraph.split(" is supported by")[0]
+        conclusion = conclusion.split(" are supported by")[0]
+        plural = conclusion in PLURAL_CONCLUSIONS
+        expected = "are supported by" if plural else "is supported by"
+        assert expected in paragraph, paragraph
 
 
 @pytest.mark.parametrize("scenario_id", SCENARIO_IDS)
